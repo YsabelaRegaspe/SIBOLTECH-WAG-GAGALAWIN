@@ -2753,3 +2753,37 @@ function showDWC() {
 	generatePlantGraphs(metric, 'dwc');
 }
 
+// Theme Toggle Functionality
+function initThemeToggle() {
+	const themeToggle = document.getElementById('themeToggle');
+	const html = document.documentElement;
+	
+	// Get saved theme from localStorage or default to 'glass'
+	const savedTheme = localStorage.getItem('sboltech-theme') || 'glass';
+	html.setAttribute('data-theme', savedTheme);
+	updateThemeIcon(savedTheme);
+	
+	// Theme toggle click handler
+	if(themeToggle) {
+		themeToggle.addEventListener('click', () => {
+			const currentTheme = html.getAttribute('data-theme');
+			const newTheme = currentTheme === 'glass' ? 'original' : 'glass';
+			
+			html.setAttribute('data-theme', newTheme);
+			localStorage.setItem('sboltech-theme', newTheme);
+			updateThemeIcon(newTheme);
+		});
+	}
+}
+
+function updateThemeIcon(theme) {
+	const themeToggle = document.getElementById('themeToggle');
+	if(themeToggle) {
+		const icon = themeToggle.querySelector('.theme-icon');
+		icon.textContent = theme === 'glass' ? '☀️' : '🌙';
+	}
+}
+
+// Initialize theme toggle on page load
+initThemeToggle();
+
