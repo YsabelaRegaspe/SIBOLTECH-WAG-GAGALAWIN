@@ -17,8 +17,9 @@
 			<span></span>
 		</button>
 		<div class="brand">
-			<img src="../siboltechlogo.png" alt="SibolTech" class="brand-logo">
+			<img src="../STLogoFinal2.png" alt="SibolTech" class="brand-logo">
 		</div>
+		
 	</header>
 
 	<aside id="sidebar" class="sidebar">
@@ -43,6 +44,7 @@
 				<li><a href="#" data-tab="manual"><span class="icon"><img src="../manualicon.png" alt="Manual"></span><span>Manual</span></a></li>
 				<li><a href="#" data-tab="history"><span class="icon"><img src="../historicon.png" alt="History"></span><span>History</span></a></li>
 				<li><a href="#" data-tab="logout"><span class="icon"><img src="../logoutlogo.png" alt="Logout"></span><span>Logout</span></a></li>
+				
 			</ul>
 		</nav>
 	</aside>
@@ -90,31 +92,65 @@
 						<div class="alert" id="alert-tds"></div></div>
 					</div>
 					<div class="actuator-card">
-						<div class="card-header">Actuator Status</div>
+						<div class="card-header actuator-header">
+							<span>Actuator Status</span>
+							<div class="override-toggle">
+								<span class="override-label">OVERRIDE:</span>
+								<label class="toggle-switch actuator-override">
+									<input type="checkbox" id="actuatorOverrideToggle">
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">OFF</span>
+								</label>
+							</div>
+						</div>
 						<div class="actuators">
 							<div class="act">
 								<div>Misting Pump</div>
-								<span class="state" id="act-water">ON</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-water" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
 							</div>
 							<div class="act">
 								<div>Air Pump</div>
-								<span class="state" id="act-air">OFF</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-air">
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">OFF</span>
+								</label>
 							</div>
 							<div class="act">
 								<div>Exhaust Fan (In)</div>
-								<span class="state" id="act-fan-in">ON</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-fan-in" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
 							</div>
 							<div class="act">
 								<div>Exhaust Fan (Out)</div>
-								<span class="state" id="act-fan-out">ON</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-fan-out" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
 							</div>
 							<div class="act">
 								<div>Grow Lights (Aerponics)</div>
-								<span class="state" id="act-lights-aerponics">ON</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-lights-aerponics" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
 							</div>
 							<div class="act">
 								<div>Grow Lights(DWC)</div>
-								<span class="state" id="act-lights-dwc">ON</span>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-lights-dwc" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
 							</div>
 						</div>
 					</div>
@@ -220,40 +256,45 @@
 						</div>
 						<div class="sensor-inputs-row">
 							<div class="sensor-input-card" data-sensor="all">
-								<div class="sensor-column">
-									<label class="sensor-input-label">
+								<div class="sensor-column" >
+									<label class="sensor-input-label"  data-key="ph">
 										<span class="sensor-label-text">pH Level</span>
-										<input type="number" step="0.1" class="sensor-input" data-sensor="all" data-field="ph" placeholder="6.5">
-										<span class="sensor-unit">pH</span>
+										
 									</label>
+									<div class="value" id="val-ph"></div>
+									<span class="sensor-unit">pH</span>
 								</div>
+								
 								<div class="sensor-column">
-									<label class="sensor-input-label">
+									<label class="sensor-input-label"  data-key="do">
 										<span class="sensor-label-text">Dissolved Oxygen</span>
-										<input type="number" step="0.1" class="sensor-input" data-sensor="all" data-field="do" placeholder="8.0">
+									
+									</label>
+									<div class="value" id="val-do"></div>
 										<span class="sensor-unit">mg/L</span>
-									</label>
 								</div>
 								<div class="sensor-column">
-									<label class="sensor-input-label">
+									<label class="sensor-input-label" data-key="tds">
 										<span class="sensor-label-text">Total Dissolved Solids</span>
-										<input type="number" step="0.1" class="sensor-input" data-sensor="all" data-field="tds" placeholder="1.2">
-										<span class="sensor-unit">ppm</span>
+										
 									</label>
+									<div class="value" id="val-tds"></div>
+									<span class="sensor-unit">ppm</span>
 								</div>
 								<div class="sensor-column">
-									<label class="sensor-input-label">
+									<label class="sensor-input-label" data-key="temp">
 										<span class="sensor-label-text">Temperature</span>
-										<input type="number" step="0.1" class="sensor-input" data-sensor="all" data-field="temp" placeholder="25.0">
-										<span class="sensor-unit">°C</span>
 									</label>
+									<div class="value" id="val-temp"></div>									
+									<span class="sensor-unit">°C</span>
 								</div>
 								<div class="sensor-column">
-									<label class="sensor-input-label">
+									<label class="sensor-input-label" data-key="hum">
 										<span class="sensor-label-text">Humidity</span>
-										<input type="number" step="0.1" class="sensor-input" data-sensor="all" data-field="hum" placeholder="70">
-										<span class="sensor-unit">%</span>
+										
 									</label>
+									<div class="value" id="val-hum"></div>
+									<span class="sensor-unit">%</span>
 								</div>
 							</div>
 						</div>
@@ -265,53 +306,68 @@
 						</div>
 						
 						<div id="dwcPlantsList">
+							<!-- Single DWC card containing six plant rows -->
 							<div class="sensor-input-card1" data-sensor="all">
+								<!-- Row 1 -->
 								<div class="sensor-inputs-row1">
-									<div class="sensor-column1 sensor-column-with-delete">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No</span>
-											<span class="sensor-number-display1">1</span>
-										</label>
-									<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Height</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Length</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Width</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No. of Leaves</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No. of Branches</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches" placeholder="">
-										</label>
-									</div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 2 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">2</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 3 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">3</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 4 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">4</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 5 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">5</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 6 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">6</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
 								</div>
 							</div>
 						</div>
-						<button id="addDwcPlant" class="add-plant-btn">Add Plant</button>
 						<!-- Inline actions placed just below DWC -->
 						
 					</div>
-<div class="inline-actions">
+				<div class="inline-actions">
 				<button id="clear" class="clear-btn">Clear</button>
 				<button id="submit-btn" class="submit-btn">Submit</button>
 			</div>
@@ -325,100 +381,130 @@
 						</div>
 						
 						<div id="traditionalPlantsList">
+							<!-- Single Traditional card containing six plant rows -->
 							<div class="sensor-input-card1" data-sensor="all">
+								<!-- Row 1 -->
 								<div class="sensor-inputs-row1">
-								<div class="sensor-column1 sensor-column-with-delete">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No</span>
-											<span class="sensor-number-display1">1</span>
-										</label>
-										<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Height</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Length</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">Width</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No. of Leaves</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves" placeholder="">
-										</label>
-									</div>
-									<div class="sensor-column1">
-										<label class="sensor-input-label1">
-											<span class="sensor-label-text1">No. of Branches</span>
-											<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches" placeholder="">
-										</label>
-									</div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 2 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">2</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 3 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">3</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 4 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">4</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 5 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">5</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 6 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">6</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
 								</div>
 							</div>
 						</div>
-						<button id="addTraditionalPlant" class="add-plant-btn">Add Plant</button>
 					</div>
 
 					<div class="aeroponics-params card" id="aeroponicsParams">
 					<div class="card-header">
 						<span>Aeroponics</span>
 					</div>
-					
+                    
 					<div id="aeroponicsPlantsList">
+						<!-- Single Aeroponics card containing six plant rows -->
 						<div class="sensor-input-card1" data-sensor="all">
+							<!-- Row 1 -->
 							<div class="sensor-inputs-row1">
-								<div class="sensor-column1 sensor-column-with-delete">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">No</span>
-										<span class="sensor-number-display1">1</span>
-									</label>
-								<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
-								</div>
-								<div class="sensor-column1">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">Height</span>
-										<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height" placeholder="">
-									</label>
-								</div>
-								<div class="sensor-column1">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">Length</span>
-										<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length" placeholder="">
-									</label>
-								</div>
-								<div class="sensor-column1">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">Width</span>
-										<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width" placeholder="">
-									</label>
-								</div>
-								<div class="sensor-column1">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">No. of Leaves</span>
-										<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves" placeholder="">
-									</label>
-								</div>
-								<div class="sensor-column1">
-									<label class="sensor-input-label1">
-										<span class="sensor-label-text1">No. of Branches</span>
-										<input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches" placeholder="">
-									</label>
-								</div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 2 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">2</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 3 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">3</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 4 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">4</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 5 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">5</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 6 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">6</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
 							</div>
 						</div>
 					</div>
-					<button id="addAeroponicsPlant" class="add-plant-btn">Add Plant</button>
 				</div>
 					
 					</div>
@@ -459,7 +545,6 @@
 				<div class="success-modal-footer">
 					<div class="modal-actions-left">
 						<button class="btn-secondary" id="copyDataBtn">Copy Data</button>
-						<button class="btn-secondary" id="downloadJsonBtn">Download JSON</button>
 					</div>
 					<div class="modal-actions-right">
 						<button class="success-ok-btn" id="successOkBtn">OK</button>
@@ -540,7 +625,7 @@
 					<li class="calibrate-tab-btn active" data-sensor="ph">pH Level</li>
 					<li class="calibrate-tab-btn" data-sensor="do">Dissolved Oxygen</li>
 					<li class="calibrate-tab-btn" data-sensor="tds">Total Dissolved Solids</li>
-				</ul>
+				</ul>	
 			</div>
 
 			<div class="calibrate-grid" data-sensor-type="ph">
@@ -558,9 +643,7 @@
 				<div class="cal-card sensor-readings">
 					<div class="card-header">Sensor Readings</div>
 					<div class="readings-grid">
-						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltage">--</div></div>
-						<div class="reading"><div class="label">Temperature</div><div class="value" id="readingTemp">--</div></div>
-					</div>
+						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltage">--</div></div>					</div>
 				</div>
 			</div>
 
@@ -580,7 +663,6 @@
 					<div class="card-header">Sensor Readings</div>
 					<div class="readings-grid">
 						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltageDO">--</div></div>
-						<div class="reading"><div class="label">Temperature</div><div class="value" id="readingTempDO">--</div></div>
 					</div>
 				</div>
 			</div>
@@ -601,7 +683,6 @@
 					<div class="card-header">Sensor Readings</div>
 					<div class="readings-grid">
 						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltageTDS">--</div></div>
-						<div class="reading"><div class="label">Temperature</div><div class="value" id="readingTempTDS">--</div></div>
 					</div>
 				</div>
 			</div>
@@ -662,7 +743,7 @@
 						</div>
 						<div class="values-actions">
 							<button class="btn" id="clearCal">Clear</button>
-							<button class="btn-primary" id="applyCalValues">Apply</button>
+							<button class="btn-primary" id="applyCalValues">Update</button>
 						</div>
 					</div>
 				</div>
@@ -723,7 +804,7 @@
 						</div>
 						<div class="values-actions">
 							<button class="btn" id="clearCalDO">Clear</button>
-							<button class="btn-primary" id="applyCalValuesDO">Apply</button>
+							<button class="btn-primary" id="applyCalValuesDO">Update</button>
 						</div>
 					</div>
 				</div>
@@ -782,7 +863,7 @@
 						</div>
 						<div class="values-actions">
 							<button class="btn" id="clearCalTDS">Clear</button>
-							<button class="btn-primary" id="applyCalValuesTDS">Apply</button>
+							<button class="btn-primary" id="applyCalValuesTDS">Update</button>
 						</div>
 					</div>
 				</div>
@@ -791,11 +872,11 @@
 
 		<section id="history" class="tab-content">
 			<div class="history-board">
-				<div class="history-tabs">
-					<button class="history-tab-btn active" data-history-tab="aero">Aeroponics</button>
-					<button class="history-tab-btn" data-history-tab="dwc">Deep Water Culture</button>
-					<button class="history-tab-btn" data-history-tab="trad">Traditional</button>
-				</div>
+				<ul class="calibrate-tabs" id="historyTabs">
+					<li class="calibrate-tab-btn active" data-history-tab="aero" id="historyTabAero">Aeroponics</li>
+					<li class="calibrate-tab-btn" data-history-tab="dwc" id="historyTabDwc">Deep Water Culture</li>
+					<li class="calibrate-tab-btn" data-history-tab="trad" id="historyTabTrad">Traditional</li>
+				</ul>
 
 				<div class="history-filters">
 					<div class="history-plant-pills" aria-label="Plant selector">
@@ -809,11 +890,11 @@
 					</div>
 					<div class="history-frequency" >
 						<button class="history-chip active">Daily</button>
-						<button class="history-chip">5-min</button>
+						<button class="history-chip">15-min</button>
 					</div>
 				</div>
 
-				<div class="history-table-wrap">
+				<div class="history-table-wrap" data-history-view="sensor">
 					<table class="history-table">
 						<thead>
 							<tr class="history-head-group">
@@ -838,7 +919,27 @@
 							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
 						</tbody>
 					</table>
+
 				</div>
+
+				<div class="history-table-wrap" data-history-view="plant">
+					<table class="history-table">
+						<thead>
+							<tr class="history-head-group">
+								<th colspan="5" class="group plant">Plant Readings</th>
+							</tr>
+							<tr class="history-head-cols">
+								<th>No. of Leaves</th>
+								<th>No. of Branches</th>
+								<th>Weight</th>
+								<th>Length</th>
+								<th>Height</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+						</tbody>
+					</table>
 			</div>
 		</section>
 	
@@ -846,14 +947,16 @@
 		<div id="logoutModal" class="logout-modal" style="display: none;">
 			<div class="logout-modal-content">
 				<div class="logout-modal-header">
-					<h3>Confirm Logout</h3>
+					<div class="logout-title">
+						<h3>Sign out</h3>
+					</div>
 				</div>
 				<div class="logout-modal-body">
-					<p>Are you sure you want to logout?</p>
+					<p>Are you sure you want to logout? Any unsaved changes will be lost.</p>
 				</div>
 				<div class="logout-modal-footer">
 					<button class="logout-cancel-btn" id="logoutCancel">Cancel</button>
-					<button class="logout-confirm-btn" id="logoutConfirm">Confirm</button>
+					<button class="logout-confirm-btn" id="logoutConfirm">Sign out</button>
 				</div>
 			</div>
 		</div>

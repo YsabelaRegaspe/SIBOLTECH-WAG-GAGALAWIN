@@ -591,6 +591,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			sidebar.classList.toggle('collapsed');
 			// Add/remove body class for global styling adjustments
 			document.body.classList.toggle('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+			
+			// Close dropdown menu when sidebar is collapsed
+			if(sidebar.classList.contains('collapsed')) {
+				const predictionItem = document.querySelector('.sidebar-dropdown');
+				if(predictionItem) {
+					predictionItem.classList.remove('open');
+				}
+			}
 		}
 	});
 
@@ -669,19 +677,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		const updateHistoryEmpty = () => {
 			if (!historyEmptyCell) return;
-			const methodLabel = historyBoard.querySelector('.history-tab-btn.active')?.textContent?.trim() || 'Aeroponics';
+			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
 			const intervalLabel = historyBoard.querySelector('.history-chip.active')?.textContent?.trim() || 'Daily';
 			const plantLabel = historyBoard.querySelector('.history-pill.active')?.textContent?.trim() || '1';
 			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
 		};
 
-		historyBoard.querySelectorAll('.history-tab-btn').forEach(btn => {
-			btn.addEventListener('click', () => {
-				historyBoard.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				historyBoard.querySelectorAll('[data-history-tab]').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
+				// Toggle history table views based on selected method
+				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+					if (w.getAttribute('data-history-view') === view) w.style.display = '';
+					else w.style.display = 'none';
+				});
 			});
+		});
+
+		// Initialize view visibility
+		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+			const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+			if (w.getAttribute('data-history-view') === view) w.style.display = '';
+			else w.style.display = 'none';
 		});
 
 		historyBoard.querySelectorAll('.history-pill').forEach(pill => {
@@ -710,10 +732,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		option.addEventListener('click', (e) => {
 			e.preventDefault();
 			const metric = option.getAttribute('data-metric');
-			// Update active state (just mark it, don't generate yet)
+			// Update active state
 			document.querySelectorAll('.prediction-option').forEach(opt => opt.classList.remove('active'));
 			option.classList.add('active');
-			// Don't auto-generate - wait for user to click method button
+			
+			// Generate graphs immediately with current farming method
+			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			generatePlantGraphs(metric, selectedMethod);
+			
 			// Close mobile sidebar if open
 			if(window.innerWidth <= 900) sidebar.classList.remove('open');
 		});
@@ -1161,20 +1187,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		showThresholdModal(sensorType);
 	}, true);
 
-	// Helper function to update sensor alert
+	// Helper function to update all sensor alerts (dashboard, training, etc.)
 	function updateSensorAlert(sensorType, value){
-		const alertEl = document.getElementById(`alert-${sensorType}`);
-		if(!alertEl) return;
-
 		const {status, statusClass} = getSensorStatus(sensorType, value);
-		alertEl.textContent = status;
-		alertEl.className = `alert ${statusClass}`;
+		document.querySelectorAll(`[id="alert-${sensorType}"]`).forEach(alertEl => {
+			alertEl.textContent = status;
+			alertEl.className = `alert ${statusClass}`;
+		});
 
 		// Only show notifications for warning (normal) and critical (dangerous), not optimal (neutral)
 		if(statusClass !== 'neutral'){
 			showNotification(sensorType, value, status, statusClass);
 		}
 	}
+
+	let actuatorOverride = false;
 
 	function updateSensorsAndActuators(){
 		// sample values - replace with real sensor API later
@@ -1185,11 +1212,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
 		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
 		
-		document.getElementById('val-ph').textContent = phValue;
-		document.getElementById('val-do').textContent = doValue;
-		document.getElementById('val-temp').textContent = tempValue;
-		document.getElementById('val-hum').textContent = humValue;
-		document.getElementById('val-tds').textContent = tdsValue;
+		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
+		const setValueAll = (key, val) => {
+			document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
+		};
+		setValueAll('ph', phValue);
+		setValueAll('do', doValue);
+		setValueAll('temp', tempValue);
+		setValueAll('hum', humValue);
+		setValueAll('tds', tdsValue);
 
 		// Record values for sensor graphs time series
 		recordSensorValue('ph', parseFloat(phValue));
@@ -1205,35 +1236,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - use helper to set class + text
-		setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
-		setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
-		// Track both exhaust fans separately (in/out)
-		setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
-		setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		// actuators - only auto-adjust when override is OFF
+		if(!actuatorOverride){
+			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
+			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
+			// Track both exhaust fans separately (in/out)
+			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
+			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		}
 	}
 
-	// helper: set actuator state text + class
+	// helper: set actuator state text + checkbox
 	function setActuatorState(id, state){
-		const el = document.getElementById(id);
-		if(!el) return;
-		el.textContent = state;
-		el.classList.remove('on','off');
-		if(state === 'ON') el.classList.add('on'); else el.classList.add('off');
+		const checkbox = document.getElementById(id);
+		if(!checkbox) return;
+		const label = checkbox.closest('.toggle-switch');
+		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		
+		checkbox.checked = (state === 'ON');
+		if(toggleText) toggleText.textContent = state;
 	}
 
-	// make actuator rows clickable to toggle
-	document.querySelectorAll('.actuators .act').forEach(actEl=>{
-		actEl.addEventListener('click', ()=>{
-			const span = actEl.querySelector('.state');
-			if(!span || !span.id) return;
-			const current = span.textContent.trim();
-			const next = current === 'ON' ? 'OFF' : 'ON';
-			setActuatorState(span.id, next);
+	// Add event listeners to actuator toggles to update text
+	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			const label = checkbox.closest('.toggle-switch');
+			const toggleText = label ? label.querySelector('.toggle-text') : null;
+			if(toggleText) {
+				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
+			}
 		});
 	});
+
+	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	const overrideToggle = document.getElementById('actuatorOverrideToggle');
+	if(overrideToggle){
+		const updateOverrideState = () => {
+			const label = overrideToggle.closest('.toggle-switch');
+			const textEl = label ? label.querySelector('.toggle-text') : null;
+			actuatorOverride = overrideToggle.checked;
+			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+		};
+		overrideToggle.addEventListener('change', updateOverrideState);
+		updateOverrideState();
+	}
 
 	// Nutrient solution quick actions
 	function showNutrientNotification(label){
@@ -1907,7 +1955,7 @@ const metricInfo = {
 		description: 'Predicted leaf count based on growth model for all plants.'
 	},
 	width: { 
-		label: 'width', 
+		label: 'Width', 
 		unit: 'cm', 
 		range: [0.5, 3.5], 
 		description: 'Estimated plant width over time for all plants.'
@@ -2752,4 +2800,38 @@ function showDWC() {
 	const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
 	generatePlantGraphs(metric, 'dwc');
 }
+
+// Theme Toggle Functionality
+function initThemeToggle() {
+	const themeToggle = document.getElementById('themeToggle');
+	const html = document.documentElement;
+	
+	// Get saved theme from localStorage or default to 'glass'
+	const savedTheme = localStorage.getItem('sboltech-theme') || 'glass';
+	html.setAttribute('data-theme', savedTheme);
+	updateThemeIcon(savedTheme);
+	
+	// Theme toggle click handler
+	if(themeToggle) {
+		themeToggle.addEventListener('click', () => {
+			const currentTheme = html.getAttribute('data-theme');
+			const newTheme = currentTheme === 'glass' ? 'original' : 'glass';
+			
+			html.setAttribute('data-theme', newTheme);
+			localStorage.setItem('sboltech-theme', newTheme);
+			updateThemeIcon(newTheme);
+		});
+	}
+}
+
+function updateThemeIcon(theme) {
+	const themeToggle = document.getElementById('themeToggle');
+	if(themeToggle) {
+		const icon = themeToggle.querySelector('.theme-icon');
+		icon.textContent = theme === 'glass' ? '☀️' : '🌙';
+	}
+}
+
+// Initialize theme toggle on page load
+initThemeToggle();
 
