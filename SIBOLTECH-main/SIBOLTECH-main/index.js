@@ -257,7 +257,13 @@
 	const calDate = document.getElementById('calDate');
 	if (calDate) {
 		const now = new Date();
-		calDate.textContent = `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString()}`;
+		const formatted = `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString()}`;
+		calDate.textContent = formatted;
+		// also set DO and TDS calibration date labels if present
+		const calDateDO = document.getElementById('calDateDO');
+		if (calDateDO) calDateDO.textContent = formatted;
+		const calDateTDS = document.getElementById('calDateTDS');
+		if (calDateTDS) calDateTDS.textContent = formatted;
 	}
 
 	// Initialize sensors
@@ -398,6 +404,101 @@
 		}
 
 		// Clear button
+
+		// --- Training tab switching (show/hide farming method cards) ---
+		(function initTrainingTabs(){
+			const training = document.getElementById('training');
+			if (!training) return;
+
+			const tabBtns = training.querySelectorAll('.calibrate-tab-btn');
+			const aeroCard = training.querySelector('.aeroponics-params');
+			const dwcCard = training.querySelector('.dwc-params');
+			const tradCard = training.querySelector('.traditional-params');
+
+			function showOnly(card) {
+				[aeroCard, dwcCard, tradCard].forEach(c => {
+					if (!c) return;
+					c.style.display = (c === card) ? 'block' : 'none';
+				});
+
+				// Inline actions sit in the right column; show them only when DWC is visible
+				const inlineActions = training.querySelector('.right-cards-container .inline-actions');
+				if (inlineActions) inlineActions.style.display = (card === dwcCard) ? 'flex' : 'none';
+			}
+
+			tabBtns.forEach(btn => {
+				btn.addEventListener('click', () => {
+					tabBtns.forEach(b => b.classList.remove('active'));
+					btn.classList.add('active');
+					const sensor = btn.getAttribute('data-sensor');
+					if (sensor === 'ph') showOnly(aeroCard);
+					else if (sensor === 'do') showOnly(dwcCard);
+					else if (sensor === 'tds') showOnly(tradCard);
+				});
+			});
+
+			// Initialize: click the active button or first button to set initial visibility
+			const initial = training.querySelector('.calibrate-tab-btn.active') || tabBtns[0];
+			if (initial) initial.click();
+		})();
+
+		// --- Training section buttons (new `.training-tab-btn`) ---
+		(function initTrainingTabButtons(){
+			const training = document.getElementById('training');
+			if (!training) return;
+
+			const tabBtns = training.querySelectorAll('.training-tab-btn');
+			if (!tabBtns.length) return;
+
+			const leftContainer = training.querySelector('.left-cards-container');
+			const rightContainer = training.querySelector('.right-cards-container');
+			const aeroCard = training.querySelector('.aeroponics-params');
+			const dwcCard = training.querySelector('.dwc-params');
+			const tradCard = training.querySelector('.traditional-params');
+			const inlineActions = leftContainer ? leftContainer.querySelector('.inline-actions') : null;
+
+			function showAeroView(){
+				if (leftContainer) leftContainer.style.display = 'block';
+				if (rightContainer) rightContainer.style.display = 'none';
+				if (aeroCard) aeroCard.style.display = 'block';
+				if (tradCard) tradCard.style.display = 'none';
+				if (dwcCard) dwcCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'none';
+			}
+
+			function showDwcView(){
+				if (leftContainer) leftContainer.style.display = 'none';
+				if (rightContainer) rightContainer.style.display = 'block';
+				if (dwcCard) dwcCard.style.display = 'block';
+				if (aeroCard) aeroCard.style.display = 'none';
+				if (tradCard) tradCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'none';
+			}
+
+			function showTradView(){
+				if (leftContainer) leftContainer.style.display = 'block';
+				if (rightContainer) rightContainer.style.display = 'none';
+				if (aeroCard) aeroCard.style.display = 'none';
+				if (tradCard) tradCard.style.display = 'block';
+				if (dwcCard) dwcCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'flex';
+			}
+
+			tabBtns.forEach(btn => {
+				btn.addEventListener('click', () => {
+					tabBtns.forEach(b => b.classList.remove('active'));
+					btn.classList.add('active');
+					const sensor = btn.getAttribute('data-sensor');
+					if (sensor === 'training-aero') showAeroView();
+					else if (sensor === 'training-dwc') showDwcView();
+					else if (sensor === 'training-trad') showTradView();
+				});
+			});
+
+			// Initialize view
+			const initial = training.querySelector('.training-tab-btn.active') || tabBtns[0];
+			if (initial) initial.click();
+		})();
 		const clearBtn = document.getElementById(`clearCal${sensorType === 'ph' ? '' : sensorType.toUpperCase()}`);
 		if (clearBtn) {
 			clearBtn.addEventListener('click', () => {
@@ -591,6 +692,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			sidebar.classList.toggle('collapsed');
 			// Add/remove body class for global styling adjustments
 			document.body.classList.toggle('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+			
+			// Close dropdown menu when sidebar is collapsed
+			if(sidebar.classList.contains('collapsed')) {
+				const predictionItem = document.querySelector('.sidebar-dropdown');
+				if(predictionItem) {
+					predictionItem.classList.remove('open');
+				}
+			}
 		}
 	});
 
@@ -669,19 +778,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		const updateHistoryEmpty = () => {
 			if (!historyEmptyCell) return;
-			const methodLabel = historyBoard.querySelector('.history-tab-btn.active')?.textContent?.trim() || 'Aeroponics';
+			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
 			const intervalLabel = historyBoard.querySelector('.history-chip.active')?.textContent?.trim() || 'Daily';
 			const plantLabel = historyBoard.querySelector('.history-pill.active')?.textContent?.trim() || '1';
 			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
 		};
 
-		historyBoard.querySelectorAll('.history-tab-btn').forEach(btn => {
-			btn.addEventListener('click', () => {
-				historyBoard.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				historyBoard.querySelectorAll('[data-history-tab]').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
+				// Toggle history table views based on selected method
+				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+					if (w.getAttribute('data-history-view') === view) w.style.display = '';
+					else w.style.display = 'none';
+				});
 			});
+		});
+
+		// Initialize view visibility
+		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+			const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+			if (w.getAttribute('data-history-view') === view) w.style.display = '';
+			else w.style.display = 'none';
 		});
 
 		historyBoard.querySelectorAll('.history-pill').forEach(pill => {
@@ -710,10 +833,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		option.addEventListener('click', (e) => {
 			e.preventDefault();
 			const metric = option.getAttribute('data-metric');
-			// Update active state (just mark it, don't generate yet)
+			// Update active state
 			document.querySelectorAll('.prediction-option').forEach(opt => opt.classList.remove('active'));
 			option.classList.add('active');
-			// Don't auto-generate - wait for user to click method button
+			
+			// Generate graphs immediately with current farming method
+			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			generatePlantGraphs(metric, selectedMethod);
+			
 			// Close mobile sidebar if open
 			if(window.innerWidth <= 900) sidebar.classList.remove('open');
 		});
@@ -1161,20 +1288,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		showThresholdModal(sensorType);
 	}, true);
 
-	// Helper function to update sensor alert
+	// Helper function to update all sensor alerts (dashboard, training, etc.)
 	function updateSensorAlert(sensorType, value){
-		const alertEl = document.getElementById(`alert-${sensorType}`);
-		if(!alertEl) return;
-
 		const {status, statusClass} = getSensorStatus(sensorType, value);
-		alertEl.textContent = status;
-		alertEl.className = `alert ${statusClass}`;
+		document.querySelectorAll(`[id="alert-${sensorType}"]`).forEach(alertEl => {
+			alertEl.textContent = status;
+			alertEl.className = `alert ${statusClass}`;
+		});
 
 		// Only show notifications for warning (normal) and critical (dangerous), not optimal (neutral)
 		if(statusClass !== 'neutral'){
 			showNotification(sensorType, value, status, statusClass);
 		}
 	}
+
+	let actuatorOverride = false;
 
 	function updateSensorsAndActuators(){
 		// sample values - replace with real sensor API later
@@ -1185,11 +1313,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
 		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
 		
-		document.getElementById('val-ph').textContent = phValue;
-		document.getElementById('val-do').textContent = doValue;
-		document.getElementById('val-temp').textContent = tempValue;
-		document.getElementById('val-hum').textContent = humValue;
-		document.getElementById('val-tds').textContent = tdsValue;
+		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
+		const setValueAll = (key, val) => {
+			document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
+		};
+		setValueAll('ph', phValue);
+		setValueAll('do', doValue);
+		setValueAll('temp', tempValue);
+		setValueAll('hum', humValue);
+		setValueAll('tds', tdsValue);
 
 		// Record values for sensor graphs time series
 		recordSensorValue('ph', parseFloat(phValue));
@@ -1205,35 +1337,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - use helper to set class + text
-		setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
-		setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
-		// Track both exhaust fans separately (in/out)
-		setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
-		setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		// actuators - only auto-adjust when override is OFF
+		if(!actuatorOverride){
+			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
+			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
+			// Track both exhaust fans separately (in/out)
+			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
+			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		}
 	}
 
-	// helper: set actuator state text + class
+	// helper: set actuator state text + checkbox
 	function setActuatorState(id, state){
-		const el = document.getElementById(id);
-		if(!el) return;
-		el.textContent = state;
-		el.classList.remove('on','off');
-		if(state === 'ON') el.classList.add('on'); else el.classList.add('off');
+		const checkbox = document.getElementById(id);
+		if(!checkbox) return;
+		const label = checkbox.closest('.toggle-switch');
+		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		
+		checkbox.checked = (state === 'ON');
+		if(toggleText) toggleText.textContent = state;
 	}
 
-	// make actuator rows clickable to toggle
-	document.querySelectorAll('.actuators .act').forEach(actEl=>{
-		actEl.addEventListener('click', ()=>{
-			const span = actEl.querySelector('.state');
-			if(!span || !span.id) return;
-			const current = span.textContent.trim();
-			const next = current === 'ON' ? 'OFF' : 'ON';
-			setActuatorState(span.id, next);
+	// Add event listeners to actuator toggles to update text
+	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			const label = checkbox.closest('.toggle-switch');
+			const toggleText = label ? label.querySelector('.toggle-text') : null;
+			if(toggleText) {
+				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
+			}
 		});
 	});
+
+	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	const overrideToggle = document.getElementById('actuatorOverrideToggle');
+	if(overrideToggle){
+		const updateOverrideState = () => {
+			const label = overrideToggle.closest('.toggle-switch');
+			const textEl = label ? label.querySelector('.toggle-text') : null;
+			actuatorOverride = overrideToggle.checked;
+			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+		};
+		overrideToggle.addEventListener('change', updateOverrideState);
+		updateOverrideState();
+	}
 
 	// Nutrient solution quick actions
 	function showNutrientNotification(label){
@@ -1907,7 +2056,7 @@ const metricInfo = {
 		description: 'Predicted leaf count based on growth model for all plants.'
 	},
 	width: { 
-		label: 'width', 
+		label: 'Width', 
 		unit: 'cm', 
 		range: [0.5, 3.5], 
 		description: 'Estimated plant width over time for all plants.'
@@ -1931,6 +2080,71 @@ const metricInfo = {
 		description: 'Forecasted branch count for all plants.'
 	}
 };
+
+// Helper: deterministic pseudo-random predicted value per metric/plant/day
+function computePredictedValue(metric, plantNum, dateStr) {
+	const info = metricInfo[metric];
+	if(!info) return 0;
+	const seed = `${metric}:${plantNum}:${dateStr}`;
+	let s = 0;
+	for(let i=0;i<seed.length;i++) s = (s * 31 + seed.charCodeAt(i)) & 0xffffffff;
+	// map s to 0..1
+	const frac = (s >>> 0) / 4294967295;
+	const [minVal, maxVal] = info.range;
+	return minVal + frac * (maxVal - minVal);
+}
+
+function formatPred(val) {
+	return Number.isFinite(val) ? Number(val).toFixed(1) : '--';
+}
+
+// Generate an array of date labels starting from `startDateStr` (ISO yyyy-mm-dd) for `count` days
+function generateDateLabels(startDateStr, count) {
+	const labels = [];
+	const date = new Date(startDateStr + 'T00:00:00');
+	for (let i = 0; i < count; i++) {
+		const d = new Date(date.getTime());
+		d.setDate(date.getDate() + i);
+		const opts = { month: 'short', day: 'numeric' };
+		labels.push({ iso: d.toISOString().slice(0,10), display: d.toLocaleDateString(undefined, opts) });
+	}
+	return labels;
+}
+
+// Show an in-page notification using the #notificationContainer element
+function showNotification(message, timeout = 4000) {
+	const container = document.getElementById('notificationContainer');
+	if(!container) return;
+	const note = document.createElement('div');
+	note.className = 'notification show';
+	note.innerHTML = `<div class="notification-content">${message}</div><button class="notification-close" aria-label="close">&times;</button>`;
+	container.appendChild(note);
+	const closeBtn = note.querySelector('.notification-close');
+	closeBtn && closeBtn.addEventListener('click', () => { note.remove(); });
+	// auto remove after timeout
+	setTimeout(() => { if(note.parentNode) note.remove(); }, timeout);
+}
+
+// Delegate submit clicks for static or dynamically generated submit buttons.
+document.addEventListener('click', function(e) {
+	const btn = e.target.closest && e.target.closest('.submit-pred-btn');
+	if(!btn) return;
+	// find the parent plant card and its prediction input panel
+	const card = btn.closest('.plant-graph-card');
+	const panel = card ? card.querySelector('.prediction-input-panel') : null;
+	const inputs = panel ? panel.querySelectorAll('input.prediction-input') : [];
+	if(inputs.length === 0) return; // nothing to validate here
+	let allFilled = true;
+	inputs.forEach(i => { if(!i.value || String(i.value).trim() === '') allFilled = false; });
+	if(!allFilled) {
+		// show the in-page notification and stop further handlers
+		showNotification('Please fill in all actual values before submitting.');
+		e.preventDefault();
+		e.stopPropagation();
+		return;
+	}
+	// otherwise allow existing handlers (if any) to proceed
+});
 
 function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 	const containerId = farmingMethod === 'aeroponics' ? 'plantsGraphsContainer-aeroponics' : 'plantsGraphsContainer-dwc';
@@ -1994,21 +2208,149 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 	plantData.forEach(plant => {
 		const card = document.createElement('div');
 		card.className = 'plant-graph-card';
-		
+
 		const header = document.createElement('div');
 		header.className = 'card-header';
 		header.textContent = `Plant ${plant.plantNum}`;
-		
+
+		// Metrics row (predicted values for several metrics)
+		const metricsRow = document.createElement('div');
+		metricsRow.className = 'metrics-row';
+
+		const metricsList = ['leaves','branches','height','width','length'];
+		const todayStr = new Date().toISOString().slice(0,10);
+		const plantKey = `${farmingMethod}-${plant.plantNum}`;
+		const frozenKey = `plant_${plantKey}_frozenPreds`;
+		const submittedKey = `plant_${plantKey}_submittedDate`;
+
+		// If there was a submission on a previous date, clear the saved actuals so inputs reset next day
+		const prevSubmitted = localStorage.getItem(submittedKey);
+		if(prevSubmitted && prevSubmitted !== todayStr) {
+			localStorage.removeItem(`plant_${plantKey}_actuals`);
+			localStorage.removeItem(submittedKey);
+		}
+
+		let frozenPreds = null;
+		try { frozenPreds = JSON.parse(localStorage.getItem(frozenKey)); } catch(e) { frozenPreds = null; }
+
+		metricsList.forEach(m => {
+			const cardMet = document.createElement('div');
+			cardMet.className = 'metric-card';
+			const label = document.createElement('div');
+			label.className = 'metric-label';
+			label.textContent = metricInfo[m] ? metricInfo[m].label.toUpperCase() : m.toUpperCase();
+			const val = document.createElement('div');
+			val.className = 'metric-value';
+
+			// predicted value either frozen (if previously submitted) or computed for today
+			let predVal;
+			if(frozenPreds && typeof frozenPreds[m] !== 'undefined') predVal = frozenPreds[m];
+			else predVal = computePredictedValue(m, plant.plantNum, todayStr);
+
+			val.textContent = formatPred(predVal);
+			val.setAttribute('data-metric', m);
+			val.setAttribute('data-value', predVal);
+			cardMet.appendChild(label);
+			cardMet.appendChild(val);
+			metricsRow.appendChild(cardMet);
+		});
+
+		// Canvas area
 		const canvas = document.createElement('canvas');
 		canvas.className = 'plant-graph-canvas';
 		canvas.id = `plant-${plant.plantNum}-${farmingMethod}-graph`;
 		canvas.width = 600;
 		canvas.height = 250;
-		
+
+		// Input panel
+		const inputPanel = document.createElement('div');
+		inputPanel.className = 'prediction-input-panel';
+		// build inputs for same metrics
+		metricsList.forEach(m => {
+			const group = document.createElement('div');
+			group.className = 'input-group-mini';
+			const lbl = document.createElement('label');
+			lbl.className = 'input-mini-label';
+			lbl.textContent = metricInfo[m] ? metricInfo[m].label.toUpperCase() : m.toUpperCase();
+			const inp = document.createElement('input');
+			inp.type = 'number';
+			inp.step = '0.1';
+			inp.className = 'prediction-input';
+			inp.setAttribute('data-metric', m);
+			// preload any previously submitted actuals
+			const actualsKey = `plant_${plantKey}_actuals`;
+			let storedActuals = null;
+			try { storedActuals = JSON.parse(localStorage.getItem(actualsKey)); } catch(e) { storedActuals = null; }
+			if(storedActuals && typeof storedActuals[m] !== 'undefined') inp.value = storedActuals[m];
+			group.appendChild(lbl);
+			group.appendChild(inp);
+			inputPanel.appendChild(group);
+		});
+
+		// actions (submit) — place inside the input panel aligned to the right
+		const panelActions = document.createElement('div');
+		panelActions.className = 'prediction-panel-actions';
+		const submitBtn = document.createElement('button');
+		submitBtn.className = 'btn submit-pred-btn';
+		submitBtn.textContent = 'SUBMIT';
+		panelActions.appendChild(submitBtn);
+		inputPanel.appendChild(panelActions);
+
 		card.appendChild(header);
+		card.appendChild(metricsRow);
 		card.appendChild(canvas);
+		card.appendChild(inputPanel);
 		container.appendChild(card);
-		
+
+		// If submitted today, disable inputs
+		const submittedDate = localStorage.getItem(submittedKey);
+		if(submittedDate === todayStr) {
+			// disable inputs
+			const inputs = inputPanel.querySelectorAll('input');
+			inputs.forEach(i => i.disabled = true);
+			submitBtn.disabled = true;
+		}
+
+		// submit handler
+		submitBtn.addEventListener('click', () => {
+			const inputs = inputPanel.querySelectorAll('input');
+			const payload = {};
+			let allFilled = true;
+			inputs.forEach(i => {
+				if(!i.value || i.value === '') allFilled = false;
+				payload[i.getAttribute('data-metric')] = i.value ? parseFloat(i.value) : null;
+			});
+			if(!allFilled) {
+				showNotification('Please fill in all actual values before submitting.');
+				return;
+			}
+			// store actuals and freeze predicted for this plant
+			const actualsKey = `plant_${plantKey}_actuals`;
+			localStorage.setItem(actualsKey, JSON.stringify(payload));
+			// freeze predicted values (capture current shown predicted numbers)
+			const frozen = {};
+			metricsRow.querySelectorAll('.metric-value').forEach(v => {
+				const m = v.getAttribute('data-metric');
+				frozen[m] = parseFloat(v.getAttribute('data-value')) || parseFloat(v.textContent) || 0;
+			});
+			localStorage.setItem(frozenKey, JSON.stringify(frozen));
+			// mark submission date
+			localStorage.setItem(submittedKey, todayStr);
+			// disable inputs
+			inputs.forEach(i => i.disabled = true);
+			submitBtn.disabled = true;
+			// visually update metric cards to ensure they show the frozen (already same)
+			metricsRow.querySelectorAll('.metric-value').forEach(v => {
+				const m = v.getAttribute('data-metric');
+				if(typeof frozen[m] !== 'undefined') {
+					v.textContent = formatPred(frozen[m]);
+					v.setAttribute('data-value', frozen[m]);
+				}
+			});
+			// option: redraw graph to reflect locked status
+			drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
+		});
+
 		// Draw graph for this plant
 		setTimeout(() => {
 			drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
@@ -2073,89 +2415,268 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 		ctx.setLineDash([]);
 	}
 	
-	// Generate prediction data (each plant has slightly different data)
-	const baseValue = (minVal + maxVal) / 2;
-	const variance = (maxVal - minVal) / 8;
-	const plantVariance = (plantNum - 3.5) * (variance * 0.3); // Each plant differs slightly
-	const data = window.randomWalk(30, baseValue + plantVariance, variance)
-		.map(v => Math.max(minVal, Math.min(maxVal, v)));
-	
-	// Draw smooth line with gradient fill
+	// Prepare or reuse datasets for this canvas so toggles/redraws use consistent series
+	if(!canvas._actualData || !canvas._predictedData) {
+		// Use a daily series from Jan 15 to Jan 22 (inclusive) to match requested per-day data
+		const dateLabels = generateDateLabels('2026-01-15', 8); // 8 days: Jan15..Jan22
+		const nPoints = dateLabels.length;
+		const baseValue = (minVal + maxVal) / 2;
+		const variance = (maxVal - minVal) / 8;
+		const plantVariance = (plantNum - 3.5) * (variance * 0.3);
+		const actual = window.randomWalk(nPoints, baseValue + plantVariance, variance)
+			.map(v => Math.max(minVal, Math.min(maxVal, v)));
+		// default predicted derived from actual
+		let predictedSeries = actual.map((v, i) => {
+			const trend = (i / actual.length) * (variance * 0.6);
+			const bias = plantVariance * 0.25;
+			return Math.max(minVal, Math.min(maxVal, v + trend + bias));
+		});
+
+		// If a frozen predicted value exists for this plant/metric, use it to build a stable predicted series
+		try {
+			const frozenKey = `plant_${farmingMethod}-${plantNum}_frozenPreds`;
+			const frozen = JSON.parse(localStorage.getItem(frozenKey));
+			if(frozen && typeof frozen[metric] !== 'undefined') {
+				const frozenVal = parseFloat(frozen[metric]);
+				if(Number.isFinite(frozenVal)) {
+					predictedSeries = new Array(actual.length).fill(frozenVal);
+				}
+			}
+		} catch(e) {
+			// ignore
+		}
+
+		// attach dateLabels to canvas for x-axis rendering and tooltip use
+		canvas._dateLabels = dateLabels;
+		canvas._actualData = actual;
+		canvas._predictedData = predictedSeries;
+	}
+
+	const data = canvas._actualData;
+	const predicted = canvas._predictedData;
+
+	// Draw smooth area/lines using stored data
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
-	
-	// Create gradient fill
+
+	// Create gradient fill for actual
 	const gradient = ctx.createLinearGradient(leftPad, topPad, leftPad, h - bottomPad);
 	gradient.addColorStop(0, 'rgba(43, 110, 246, 0.2)');
 	gradient.addColorStop(1, 'rgba(43, 110, 246, 0)');
-	
-	// Draw fill area
-	ctx.beginPath();
+
+	// Build point lists
 	const points = [];
 	data.forEach((val, i) => {
 		const x = leftPad + (i / (data.length - 1)) * plotW;
 		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
-		points.push({x, y});
-		if(i === 0) ctx.moveTo(x, y);
+		points.push({x, y, v: val});
+	});
+
+	const predPoints = [];
+	predicted.forEach((val, i) => {
+		const x = leftPad + (i / (predicted.length - 1)) * plotW;
+		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
+		predPoints.push({x, y, v: val});
+	});
+
+	// Filled area (Actual) if enabled
+	if(canvas._showActual === undefined) canvas._showActual = true;
+	if(canvas._showPredicted === undefined) canvas._showPredicted = true;
+
+	if(canvas._showActual) {
+		ctx.beginPath();
+		points.forEach((p, i) => {
+			if(i === 0) ctx.moveTo(p.x, p.y);
+			else {
+				const prev = points[i-1];
+				const cpX = (prev.x + p.x) / 2;
+				const cpY = (prev.y + p.y) / 2;
+				ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
+			}
+		});
+		ctx.lineTo(points[points.length - 1].x, h - bottomPad);
+		ctx.lineTo(points[0].x, h - bottomPad);
+		ctx.closePath();
+		ctx.fillStyle = gradient;
+		ctx.fill();
+	}
+
+	// Draw predicted (dashed) below actual markers
+	ctx.beginPath();
+	predPoints.forEach((p, i) => {
+		if(i === 0) ctx.moveTo(p.x, p.y);
 		else {
-			// Smooth curve
-			const prevPoint = points[i - 1];
-			const cpX = (prevPoint.x + x) / 2;
-			const cpY = (prevPoint.y + y) / 2;
-			ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
+			const prev = predPoints[i-1];
+			const cpX = (prev.x + p.x) / 2;
+			const cpY = (prev.y + p.y) / 2;
+			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
 		}
 	});
-	
-	// Close fill area
-	ctx.lineTo(points[points.length - 1].x, h - bottomPad);
-	ctx.lineTo(points[0].x, h - bottomPad);
-	ctx.closePath();
-	ctx.fillStyle = gradient;
-	ctx.fill();
-	
-	// Draw line
+	ctx.setLineDash([6,6]);
+	ctx.strokeStyle = '#facc15';
+	ctx.lineWidth = 2.5;
+	if(canvas._showPredicted) ctx.stroke();
+	ctx.setLineDash([]);
+
+	// Draw actual line on top
 	ctx.beginPath();
-	points.forEach((point, i) => {
-		if(i === 0) ctx.moveTo(point.x, point.y);
+	points.forEach((p, i) => {
+		if(i === 0) ctx.moveTo(p.x, p.y);
 		else {
-			const prevPoint = points[i - 1];
-			const cpX = (prevPoint.x + point.x) / 2;
-			const cpY = (prevPoint.y + point.y) / 2;
-			ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
+			const prev = points[i-1];
+			const cpX = (prev.x + p.x) / 2;
+			const cpY = (prev.y + p.y) / 2;
+			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
 		}
 	});
 	ctx.quadraticCurveTo(points[points.length - 1].x, points[points.length - 1].y, points[points.length - 1].x, points[points.length - 1].y);
-	
 	ctx.strokeStyle = '#2b6ef6';
 	ctx.lineWidth = 3;
 	ctx.lineCap = 'round';
 	ctx.lineJoin = 'round';
 	ctx.shadowColor = 'rgba(43, 110, 246, 0.3)';
 	ctx.shadowBlur = 6;
-	ctx.stroke();
+	if(canvas._showActual) ctx.stroke();
 	ctx.shadowBlur = 0;
-	
-	// Draw data points at key positions
-	points.forEach((point, i) => {
+
+	// Draw markers for actual
+	points.forEach((p, i) => {
 		if(i % 5 === 0 || i === points.length - 1) {
-			ctx.beginPath();
-			ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-			ctx.fillStyle = '#ffffff';
-			ctx.fill();
-			ctx.strokeStyle = '#2b6ef6';
-			ctx.lineWidth = 2;
-			ctx.stroke();
+			if(canvas._showActual) {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+				ctx.fillStyle = '#ffffff';
+				ctx.fill();
+				ctx.strokeStyle = '#2b6ef6';
+				ctx.lineWidth = 2;
+				ctx.stroke();
+			}
 		}
 	});
+
+		// store points for interactivity
+		canvas._points = points;
+		canvas._predPoints = predPoints;
+
+		// Draw hover indicator (vertical line + highlight) if hovering
+		if(canvas._hoverIndex !== undefined && canvas._hoverIndex !== null) {
+			const hi = canvas._hoverIndex;
+			if(canvas._points[hi]) {
+				const hp = canvas._points[hi];
+				ctx.save();
+				ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+				ctx.setLineDash([4,4]);
+				ctx.beginPath();
+				ctx.moveTo(hp.x, topPad);
+				ctx.lineTo(hp.x, h - bottomPad);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				ctx.beginPath();
+				ctx.arc(hp.x, hp.y, 6, 0, Math.PI * 2);
+				ctx.fillStyle = '#ffffff';
+				ctx.fill();
+				ctx.lineWidth = 2;
+				ctx.strokeStyle = '#2b6ef6';
+				ctx.stroke();
+				ctx.restore();
+			}
+		}
+
+	// Create DOM legend below canvas (clickable) if not present
+	const parent = canvas.parentElement || canvas.parentNode;
+	if(parent) {
+		let legend = parent.querySelector('.canvas-legend');
+		if(!legend) {
+			legend = document.createElement('div');
+			legend.className = 'canvas-legend';
+			legend.innerHTML = `
+				<span class="legend-item legend-actual" data-series="actual"><span class="legend-swatch actual"></span>Actual</span>
+				<span class="legend-item legend-predicted" data-series="predicted"><span class="legend-swatch predicted"></span>Predicted</span>
+				<div class="legend-tooltip" style="display:none; position:absolute;"></div>
+			`;
+			parent.appendChild(legend);
+
+			// legend click handlers
+			legend.querySelector('.legend-actual').addEventListener('click', () => {
+				canvas._showActual = !canvas._showActual;
+				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+			});
+			legend.querySelector('.legend-predicted').addEventListener('click', () => {
+				canvas._showPredicted = !canvas._showPredicted;
+				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+			});
+		}
+
+		// Tooltip div (reuse existing in legend or create)
+		let tooltip = parent.querySelector('.canvas-hover-tooltip');
+		if(!tooltip) {
+			tooltip = document.createElement('div');
+			tooltip.className = 'canvas-hover-tooltip';
+			tooltip.style.display = 'none';
+			tooltip.style.position = 'absolute';
+			tooltip.style.pointerEvents = 'none';
+			parent.appendChild(tooltip);
+		}
+
+		// Mouse interaction for hover (show values)
+		canvas.onmousemove = function(evt) {
+			const rect = canvas.getBoundingClientRect();
+			const mx = evt.clientX - rect.left;
+			const my = evt.clientY - rect.top;
+			// map mx to nearest index
+			const idx = Math.round(((mx - leftPad) / plotW) * (canvas._points.length - 1));
+			if(idx < 0 || idx >= canvas._points.length) {
+				tooltip.style.display = 'none';
+				canvas._hoverIndex = null;
+				return;
+			}
+			const px = canvas._points[idx].x;
+			const py = canvas._points[idx].y;
+			const actualVal = canvas._actualData[idx];
+			const predVal = canvas._predictedData[idx];
+
+			// position tooltip near the hovered point inside the parent (.plant-graph-card)
+			const parentRect = parent.getBoundingClientRect();
+			// compute left relative to parent
+			const leftPos = (rect.left - parentRect.left) + px + 12;
+			// show tooltip first so offsetHeight is available
+			tooltip.style.display = 'block';
+			tooltip.style.background = '#fff';
+			tooltip.style.border = '1px solid #ddd';
+			tooltip.style.padding = '6px 8px';
+			tooltip.style.borderRadius = '6px';
+			tooltip.innerHTML = `<div style="font-weight:700;">${(canvas._dateLabels && canvas._dateLabels[idx] && canvas._dateLabels[idx].display) || ''}</div>
+								<div style="color:#2b6ef6">Actual: ${actualVal.toFixed(2)}</div>
+								<div style="color:#b8860b">Pred: ${predVal.toFixed(2)}</div>`;
+			const tHeight = tooltip.offsetHeight || 40;
+			let topPos = (rect.top - parentRect.top) + py - tHeight - 8;
+			// if there's no space above the point, show below
+			if(topPos < 6) topPos = (rect.top - parentRect.top) + py + 12;
+			tooltip.style.left = leftPos + 'px';
+			tooltip.style.top = topPos + 'px';
+
+			canvas._hoverIndex = idx;
+			// redraw to show hover vertical line
+			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+		};
+
+		canvas.onmouseout = function() {
+			const tooltipEl = parent.querySelector('.canvas-hover-tooltip');
+			if(tooltipEl) tooltipEl.style.display = 'none';
+			canvas._hoverIndex = null;
+			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+		};
+	}
 	
-	// X-axis labels
+	// X-axis labels: use per-canvas date labels if available
 	ctx.fillStyle = '#9aa4b8';
 	ctx.font = '10px Segoe UI, Arial, sans-serif';
 	ctx.textAlign = 'center';
-	const days = ['Day 1', 'Day 10', 'Day 20', 'Day 30'];
-	days.forEach((day, i) => {
-		const x = leftPad + (i / (days.length - 1)) * plotW;
-		ctx.fillText(day, x, h - bottomPad + 20);
+	const labels = (canvas._dateLabels && canvas._dateLabels.map(d => d.display)) || ['Day 1','Day 2','Day 3','Day 4'];
+	labels.forEach((lab, i) => {
+		const x = leftPad + (i / (labels.length - 1)) * plotW;
+		ctx.fillText(lab, x, h - bottomPad + 20);
 	});
 	
 	// Y-axis label
@@ -2752,4 +3273,38 @@ function showDWC() {
 	const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
 	generatePlantGraphs(metric, 'dwc');
 }
+
+// Theme Toggle Functionality
+function initThemeToggle() {
+	const themeToggle = document.getElementById('themeToggle');
+	const html = document.documentElement;
+	
+	// Get saved theme from localStorage or default to 'glass'
+	const savedTheme = localStorage.getItem('sboltech-theme') || 'glass';
+	html.setAttribute('data-theme', savedTheme);
+	updateThemeIcon(savedTheme);
+	
+	// Theme toggle click handler
+	if(themeToggle) {
+		themeToggle.addEventListener('click', () => {
+			const currentTheme = html.getAttribute('data-theme');
+			const newTheme = currentTheme === 'glass' ? 'original' : 'glass';
+			
+			html.setAttribute('data-theme', newTheme);
+			localStorage.setItem('sboltech-theme', newTheme);
+			updateThemeIcon(newTheme);
+		});
+	}
+}
+
+function updateThemeIcon(theme) {
+	const themeToggle = document.getElementById('themeToggle');
+	if(themeToggle) {
+		const icon = themeToggle.querySelector('.theme-icon');
+		icon.textContent = theme === 'glass' ? '☀️' : '🌙';
+	}
+}
+
+// Initialize theme toggle on page load
+initThemeToggle();
 
