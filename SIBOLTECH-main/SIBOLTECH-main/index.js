@@ -289,20 +289,34 @@
 		const container = document.getElementById(config.containerId);
 		if (container) {
 			container.addEventListener('click', (e) => {
-				const btn = e.target;
-				const isApply = btn.classList.contains('btn-apply') || btn.id.includes('applyInputs');
-				const isEdit = btn.classList.contains('btn-edit') || btn.id.includes('editInputs');
-
-				if (!isApply && !isEdit) return;
+				// ensure we get the button element even if an inner node was clicked
+				const btn = e.target.closest && e.target.closest('button');
+				const isApply = btn && (btn.classList.contains('btn-apply') || btn.id.includes('applyInputs'));
+				if (!isApply) return;
 
 				const grid = btn.closest('.inputs-grid');
 				const pointNum = parseInt(grid.getAttribute('data-point'));
 				const inputs = grid.querySelectorAll('input');
 
-				if (isApply) {
+				// Target calibration inputs only
+				const targetSel = `.${config.inputClass}, .inputVoltage, .inputTemp`;
+				const targetInputs = grid.querySelectorAll(targetSel);
+
+				// Determine current state: if target inputs are disabled => currently applied state
+				const anyDisabled = Array.from(targetInputs).some(i => i.disabled);
+
+				if (anyDisabled) {
+					// Currently applied -> enable calibration inputs for editing
+					targetInputs.forEach(i => i.disabled = false);
+					// Hide calibration values section while editing
+					const valSection = document.getElementById(config.sections[2]);
+					if (valSection) valSection.style.display = 'none';
+					// Keep button text as 'Apply'
+				} else {
+					// Currently editable -> Apply: validate, save, then disable calibration inputs
 					let allFilled = true;
-					inputs.forEach(i => { if (!i.value.trim()) allFilled = false; });
-					
+					targetInputs.forEach(i => { if (!i.value.trim()) allFilled = false; });
+
 					if (!allFilled && state[sensorType].mode !== '1') {
 						showValidationModal('Please fill in all values before applying.');
 						return;
@@ -324,34 +338,18 @@
 					if (existingIdx >= 0) state[sensorType].data[existingIdx] = dataPoint;
 					else state[sensorType].data.push(dataPoint);
 
-					inputs.forEach(i => i.disabled = true);
-					btn.textContent = 'Edit';
-					btn.classList.remove('btn-apply');
-					btn.classList.add('btn-edit');
+					// disable only calibration fields
+					targetInputs.forEach(i => i.disabled = true);
 
 					// Show calibration values section only if all required points are completed
 					const requiredPoints = parseInt(state[sensorType].mode);
 					const completedPoints = state[sensorType].data.length;
-					
 					if (completedPoints >= requiredPoints) {
 						const valSection = document.getElementById(config.sections[2]);
 						if (valSection) valSection.style.setProperty('display', 'block', 'important');
 					}
 					const inputPanel = document.getElementById(config.sections[1]);
 					if (inputPanel) inputPanel.style.setProperty('display', 'block', 'important');
-				} else {
-					inputs.forEach(i => i.disabled = false);
-					btn.textContent = 'Apply';
-					btn.classList.remove('btn-edit');
-					btn.classList.add('btn-apply');
-					
-					// Hide calibration values section when editing
-					const valSection = document.getElementById(config.sections[2]);
-					if (valSection) valSection.style.display = 'none';
-					
-					// Remove the data point from state
-					const existingIdx = state[sensorType].data.findIndex(d => d.point === pointNum);
-					if (existingIdx >= 0) state[sensorType].data.splice(existingIdx, 1);
 				}
 			});
 		}
@@ -1432,6 +1430,110 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	setupNutrientButtons();
 
+	// Helper to show prediction success modal
+	function showPredictionSuccessModal() {
+		const modal = document.getElementById('predictionSuccessModal');
+		if(modal) {
+			modal.style.display = 'flex';
+			// Auto-close after 2 seconds
+			setTimeout(() => {
+				if(modal.style.display === 'flex') {
+					modal.style.display = 'none';
+				}
+			}, 2000);
+		}
+	}
+
+	function closePredictionSuccessModal() {
+		const modal = document.getElementById('predictionSuccessModal');
+		if(modal) modal.style.display = 'none';
+	}
+
+	// Global submit handler for prediction section
+	const submitAllPredBtn = document.getElementById('submitAllPredBtn');
+	if(submitAllPredBtn) {
+		submitAllPredBtn.addEventListener('click', () => {
+			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			const containerId = selectedMethod === 'aeroponics' ? 'plantsGraphsContainer-aeroponics' : 'plantsGraphsContainer-dwc';
+			const container = document.getElementById(containerId);
+			if(!container) return;
+
+			const cards = container.querySelectorAll('.plant-graph-card');
+			const todayStr = new Date().toISOString().slice(0,10);
+			let hasEmptyInputs = false;
+
+			cards.forEach(card => {
+				const inputs = card.querySelectorAll('.prediction-input');
+				inputs.forEach(input => {
+					if(!input.value || input.value.trim() === '') {
+						hasEmptyInputs = true;
+					}
+				});
+			});
+
+			if(hasEmptyInputs) {
+				showToast('Please fill in all actual values before submitting.', 'dangerous');
+				return;
+			}
+
+			// Process all cards
+			cards.forEach(card => {
+				const plantKey = card.getAttribute('data-plant-key');
+				const metric = card.getAttribute('data-metric');
+				if(!plantKey || !metric) return;
+
+				const inputs = card.querySelectorAll('.prediction-input');
+				const payload = {};
+				inputs.forEach(i => {
+					const m = i.getAttribute('data-metric');
+					payload[m] = i.value ? parseFloat(i.value) : null;
+				});
+
+				// store actuals
+				const actualsKey = `plant_${plantKey}_actuals`;
+				localStorage.setItem(actualsKey, JSON.stringify(payload));
+				Object.entries(payload).forEach(([metricName, val]) => {
+					const perMetricKey = `plant_${plantKey}_${metricName}_actual`;
+					if(val !== null && val !== undefined && !Number.isNaN(val)) {
+						localStorage.setItem(perMetricKey, String(val));
+					} else {
+						localStorage.removeItem(perMetricKey);
+					}
+				});
+
+				// freeze predicted values
+				const frozen = {};
+				const metricsRow = card.querySelector('.metrics-row');
+				metricsRow.querySelectorAll('.metric-value').forEach(v => {
+					const m = v.getAttribute('data-metric');
+					frozen[m] = parseFloat(v.getAttribute('data-value')) || parseFloat(v.textContent) || 0;
+				});
+				const frozenKey = `plant_${plantKey}_frozenPreds`;
+				localStorage.setItem(frozenKey, JSON.stringify(frozen));
+				
+				// mark submission date
+				const submittedKey = `plant_${plantKey}_${metric}_submittedDate`;
+				localStorage.setItem(submittedKey, todayStr);
+
+				// disable inputs
+				inputs.forEach(i => i.disabled = true);
+
+				// redraw graph
+				const canvas = card.querySelector('.plant-graph-canvas');
+				if(canvas) {
+					const plantNum = parseInt(plantKey.split('-')[1]);
+					drawPlantGraph(canvas.id, metric, plantNum, selectedMethod);
+				}
+			});
+
+			// Show success modal with submitted data
+			showPredictionSuccessModal();
+			showToast('All predictions submitted successfully!', 'success');
+		});
+	}
+
+	// Prediction success modal closes automatically - no click handlers needed
+
 	// initial draw and periodic updates - wait a bit for layout to settle
 	setTimeout(() => {
 		console.log('Startup initialization starting...');
@@ -1469,6 +1571,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			drawComparisonGraph();
 		});
 	});
+
+// Topbar clock: update date and time every second
+function updateTopbarClock() {
+	const timeEl = document.getElementById('topbarTime');
+	const dateEl = document.getElementById('topbarDate');
+	if(!timeEl || !dateEl) return;
+	const now = new Date();
+	const hh = String(now.getHours()).padStart(2,'0');
+	const mm = String(now.getMinutes()).padStart(2,'0');
+	const ss = String(now.getSeconds()).padStart(2,'0');
+	timeEl.textContent = `${hh}:${mm}:${ss}`;
+	// Build a richer date display: short weekday, short month+day, and year
+	const weekday = now.toLocaleDateString(undefined, { weekday: 'short' }); // e.g. "Thu"
+	const monthDay = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // e.g. "Jan 16"
+	const year = now.getFullYear();
+	dateEl.innerHTML = `
+		<span class="tb-weekday">${weekday}</span>
+		<span class="tb-monthday">${monthDay}</span>
+		<span class="tb-year">${year}</span>
+	`;
+	// tooltip with full localized datetime
+	dateEl.title = now.toLocaleString();
+}
+
+// start clock after DOM ready
+setTimeout(() => {
+	updateTopbarClock();
+	setInterval(updateTopbarClock, 1000);
+}, 200);
 
 	// Traditional Farming: Add plant row handler
 	const addTraditionalPlantBtn = document.getElementById('addTraditionalPlant');
@@ -1827,84 +1958,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	// Success modal handlers
 	function showSuccessModal(submittedData) {
 		const modal = document.getElementById('successModal');
-		const body = document.getElementById('successModalBody');
-		
-		if (modal && body) {
-			// Format the submitted data for display
-			let htmlContent = '<div style="font-size: 14px; line-height: 1.8;">';
-			
-			// Sensor Readings
-			const sensorCard = document.querySelector('[data-sensor="all"]');
-			if (sensorCard) {
-				htmlContent += '<strong>Sensor Readings:</strong><br>';
-				const fields = ['ph', 'do', 'tds', 'temp', 'hum'];
-				fields.forEach(field => {
-					const input = sensorCard.querySelector(`[data-field="${field}"]`);
-					if (input && input.value) {
-						const label = input.closest('.sensor-input-label').querySelector('.sensor-label-text').textContent;
-						const unit = input.closest('.sensor-input-label').querySelector('.sensor-unit').textContent;
-						htmlContent += `${label}: ${input.value} ${unit}<br>`;
-					}
-				});
-				htmlContent += '<br>';
-			}
-
-			// Traditional Farming
-			const traditionalList = document.getElementById('traditionalPlantsList');
-			if (traditionalList) {
-				const rows = traditionalList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Traditional Farming:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-					htmlContent += '<br>';
-				}
-			}
-
-			// DWC
-			const dwcList = document.getElementById('dwcPlantsList');
-			if (dwcList) {
-				const rows = dwcList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Deep Water Culture:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-					htmlContent += '<br>';
-				}
-			}
-
-			// Aeroponics
-			const aeroList = document.getElementById('aeroponicsPlantsList');
-			if (aeroList) {
-				const rows = aeroList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Aeroponics:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-				}
-			}
-
-			htmlContent += '</div>';
-			body.innerHTML = htmlContent;
+		if (modal) {
 			modal.style.display = 'flex';
+			// Auto-close after 2 seconds
+			setTimeout(() => {
+				if(modal.style.display === 'flex') {
+					modal.style.display = 'none';
+					clearAllFields();
+				}
+			}, 2000);
 		}
 	}
 
@@ -1945,6 +2007,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		// Show success modal
 		showSuccessModal(data);
+		showToast('Data submitted successfully!', 'success');
 	}
 
 	function clearAllFields() {
@@ -2007,32 +2070,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		});
 	}
 
-	// Success modal event listeners
-	const successCloseBtn = document.getElementById('successModalClose');
-	if (successCloseBtn) {
-		successCloseBtn.addEventListener('click', () => {
-			closeSuccessModal();
-			clearAllFields();
-		});
-	}
-
-	const successOkBtn = document.getElementById('successOkBtn');
-	if (successOkBtn) {
-		successOkBtn.addEventListener('click', () => {
-			closeSuccessModal();
-			clearAllFields();
-		});
-	}
-
-	const successModal = document.getElementById('successModal');
-	if (successModal) {
-		successModal.addEventListener('click', (e) => {
-			if (e.target === successModal) {
-				closeSuccessModal();
-				clearAllFields();
-			}
-		});
-	}
+	// Success modal closes automatically - no click handlers needed
 
 	// Calibration apply
 	const applyCal = document.getElementById('applyCal');
@@ -2102,26 +2140,33 @@ function formatPred(val) {
 function generateDateLabels(startDateStr, count) {
 	const labels = [];
 	const date = new Date(startDateStr + 'T00:00:00');
+	// Shift displayed dates forward one day (user preference): Jan 15 -> Jan 16, etc.
 	for (let i = 0; i < count; i++) {
 		const d = new Date(date.getTime());
-		d.setDate(date.getDate() + i);
+		d.setDate(date.getDate() + i + 1);
 		const opts = { month: 'short', day: 'numeric' };
 		labels.push({ iso: d.toISOString().slice(0,10), display: d.toLocaleDateString(undefined, opts) });
 	}
 	return labels;
 }
 
-// Show an in-page notification using the #notificationContainer element
-function showNotification(message, timeout = 4000) {
+// Show an in-page toast notification using the #notificationContainer element
+function showToast(message, type = 'neutral', timeout = 4000) {
 	const container = document.getElementById('notificationContainer');
 	if(!container) return;
+	const icon = type === 'dangerous' ? '⚠️' : (type === 'success' ? '✅' : 'ℹ️');
 	const note = document.createElement('div');
-	note.className = 'notification show';
-	note.innerHTML = `<div class="notification-content">${message}</div><button class="notification-close" aria-label="close">&times;</button>`;
+	note.className = `notification show ${type}`;
+	note.innerHTML = `
+		<div class="notification-icon">${icon}</div>
+		<div class="notification-content">${message}</div>
+		<button class="notification-close" aria-label="close">&times;</button>
+	`;
 	container.appendChild(note);
 	const closeBtn = note.querySelector('.notification-close');
-	closeBtn && closeBtn.addEventListener('click', () => { note.remove(); });
-	// auto remove after timeout
+	if(closeBtn) {
+		closeBtn.addEventListener('click', () => note.remove());
+	}
 	setTimeout(() => { if(note.parentNode) note.remove(); }, timeout);
 }
 
@@ -2138,7 +2183,7 @@ document.addEventListener('click', function(e) {
 	inputs.forEach(i => { if(!i.value || String(i.value).trim() === '') allFilled = false; });
 	if(!allFilled) {
 		// show the in-page notification and stop further handlers
-		showNotification('Please fill in all actual values before submitting.');
+		showToast('Please fill in all actual values before submitting.', 'dangerous');
 		e.preventDefault();
 		e.stopPropagation();
 		return;
@@ -2213,46 +2258,84 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 		header.className = 'card-header';
 		header.textContent = `Plant ${plant.plantNum}`;
 
-		// Metrics row (predicted values for several metrics)
+		// Metrics row (side-by-side predicted and actual)
 		const metricsRow = document.createElement('div');
-		metricsRow.className = 'metrics-row';
+		metricsRow.className = 'metrics-row metrics-row-sidebyside';
 
-		const metricsList = ['leaves','branches','height','width','length'];
+		// Show only the currently selected metric on the card/input panel
+		const metricsList = [metric];
 		const todayStr = new Date().toISOString().slice(0,10);
 		const plantKey = `${farmingMethod}-${plant.plantNum}`;
 		const frozenKey = `plant_${plantKey}_frozenPreds`;
-		const submittedKey = `plant_${plantKey}_submittedDate`;
+		const submittedKey = `plant_${plantKey}_${metric}_submittedDate`;
+		const metricKeys = ['leaves','branches','height','width','length'];
 
 		// If there was a submission on a previous date, clear the saved actuals so inputs reset next day
 		const prevSubmitted = localStorage.getItem(submittedKey);
 		if(prevSubmitted && prevSubmitted !== todayStr) {
 			localStorage.removeItem(`plant_${plantKey}_actuals`);
+			metricKeys.forEach(m => localStorage.removeItem(`plant_${plantKey}_${m}_actual`));
 			localStorage.removeItem(submittedKey);
 		}
 
 		let frozenPreds = null;
 		try { frozenPreds = JSON.parse(localStorage.getItem(frozenKey)); } catch(e) { frozenPreds = null; }
 
+		// Create side-by-side predicted and actual layout
 		metricsList.forEach(m => {
-			const cardMet = document.createElement('div');
-			cardMet.className = 'metric-card';
-			const label = document.createElement('div');
-			label.className = 'metric-label';
-			label.textContent = metricInfo[m] ? metricInfo[m].label.toUpperCase() : m.toUpperCase();
-			const val = document.createElement('div');
-			val.className = 'metric-value';
-
 			// predicted value either frozen (if previously submitted) or computed for today
 			let predVal;
 			if(frozenPreds && typeof frozenPreds[m] !== 'undefined') predVal = frozenPreds[m];
 			else predVal = computePredictedValue(m, plant.plantNum, todayStr);
 
-			val.textContent = formatPred(predVal);
-			val.setAttribute('data-metric', m);
-			val.setAttribute('data-value', predVal);
-			cardMet.appendChild(label);
-			cardMet.appendChild(val);
-			metricsRow.appendChild(cardMet);
+			// Predicted card
+			const predCard = document.createElement('div');
+			predCard.className = 'metric-card metric-predicted';
+			const predLabel = document.createElement('div');
+			predLabel.className = 'metric-label';
+			predLabel.textContent = `PREDICTED ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
+			const predValue = document.createElement('div');
+			predValue.className = 'metric-value';
+			predValue.textContent = formatPred(predVal);
+			predValue.setAttribute('data-metric', m);
+			predValue.setAttribute('data-value', predVal);
+			predCard.appendChild(predLabel);
+			predCard.appendChild(predValue);
+
+			// Actual card with input
+			const actualCard = document.createElement('div');
+			actualCard.className = 'metric-card metric-actual';
+			const actualLabel = document.createElement('div');
+			actualLabel.className = 'metric-label';
+			actualLabel.textContent = `ACTUAL ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
+			const actualInput = document.createElement('input');
+			actualInput.type = 'number';
+			actualInput.step = '0.1';
+			actualInput.className = 'metric-input prediction-input';
+			actualInput.setAttribute('data-metric', m);
+			actualInput.id = `actual-${plantKey}-${m}`;
+			actualInput.placeholder = '0.0';
+			
+			// preload previously submitted actuals
+			const actualsKey = `plant_${plantKey}_actuals`;
+			const metricKey = `plant_${plantKey}_${m}_actual`;
+			let storedActuals = null;
+			let metricVal = null;
+			try { storedActuals = JSON.parse(localStorage.getItem(actualsKey)); } catch(e) { storedActuals = null; }
+			const metricStored = localStorage.getItem(metricKey);
+			if(metricStored !== null && metricStored !== undefined) {
+				const parsed = parseFloat(metricStored);
+				if(Number.isFinite(parsed)) metricVal = parsed;
+			} else if(storedActuals && typeof storedActuals[m] !== 'undefined') {
+				metricVal = storedActuals[m];
+			}
+			if(Number.isFinite(metricVal)) actualInput.value = metricVal;
+			
+			actualCard.appendChild(actualLabel);
+			actualCard.appendChild(actualInput);
+
+			metricsRow.appendChild(predCard);
+			metricsRow.appendChild(actualCard);
 		});
 
 		// Canvas area
@@ -2262,94 +2345,41 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 		canvas.width = 600;
 		canvas.height = 250;
 
-		// Input panel
-		const inputPanel = document.createElement('div');
-		inputPanel.className = 'prediction-input-panel';
-		// build inputs for same metrics
-		metricsList.forEach(m => {
-			const group = document.createElement('div');
-			group.className = 'input-group-mini';
-			const lbl = document.createElement('label');
-			lbl.className = 'input-mini-label';
-			lbl.textContent = metricInfo[m] ? metricInfo[m].label.toUpperCase() : m.toUpperCase();
-			const inp = document.createElement('input');
-			inp.type = 'number';
-			inp.step = '0.1';
-			inp.className = 'prediction-input';
-			inp.setAttribute('data-metric', m);
-			// preload any previously submitted actuals
-			const actualsKey = `plant_${plantKey}_actuals`;
-			let storedActuals = null;
-			try { storedActuals = JSON.parse(localStorage.getItem(actualsKey)); } catch(e) { storedActuals = null; }
-			if(storedActuals && typeof storedActuals[m] !== 'undefined') inp.value = storedActuals[m];
-			group.appendChild(lbl);
-			group.appendChild(inp);
-			inputPanel.appendChild(group);
-		});
-
-		// actions (submit) — place inside the input panel aligned to the right
-		const panelActions = document.createElement('div');
-		panelActions.className = 'prediction-panel-actions';
-		const submitBtn = document.createElement('button');
-		submitBtn.className = 'btn submit-pred-btn';
-		submitBtn.textContent = 'SUBMIT';
-		panelActions.appendChild(submitBtn);
-		inputPanel.appendChild(panelActions);
+		// Legend panel below graph
+		const legendPanel = document.createElement('div');
+		legendPanel.className = 'canvas-legend';
+		legendPanel.innerHTML = `
+			<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
+			<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
+		`;
 
 		card.appendChild(header);
 		card.appendChild(metricsRow);
 		card.appendChild(canvas);
-		card.appendChild(inputPanel);
+		card.appendChild(legendPanel);
+
+		// Add "Show all" button to the card (bottom-right)
+		const showAllBtn = document.createElement('button');
+		showAllBtn.className = 'btn show-all-btn';
+		showAllBtn.setAttribute('aria-label', 'Show all data');
+		showAllBtn.textContent = 'Show all';
+		showAllBtn.addEventListener('click', () => {
+			openShowAllModal(plant.plantNum, farmingMethod, metric);
+		});
+		card.appendChild(showAllBtn);
 		container.appendChild(card);
 
 		// If submitted today, disable inputs
 		const submittedDate = localStorage.getItem(submittedKey);
 		if(submittedDate === todayStr) {
 			// disable inputs
-			const inputs = inputPanel.querySelectorAll('input');
+			const inputs = card.querySelectorAll('.prediction-input');
 			inputs.forEach(i => i.disabled = true);
-			submitBtn.disabled = true;
 		}
 
-		// submit handler
-		submitBtn.addEventListener('click', () => {
-			const inputs = inputPanel.querySelectorAll('input');
-			const payload = {};
-			let allFilled = true;
-			inputs.forEach(i => {
-				if(!i.value || i.value === '') allFilled = false;
-				payload[i.getAttribute('data-metric')] = i.value ? parseFloat(i.value) : null;
-			});
-			if(!allFilled) {
-				showNotification('Please fill in all actual values before submitting.');
-				return;
-			}
-			// store actuals and freeze predicted for this plant
-			const actualsKey = `plant_${plantKey}_actuals`;
-			localStorage.setItem(actualsKey, JSON.stringify(payload));
-			// freeze predicted values (capture current shown predicted numbers)
-			const frozen = {};
-			metricsRow.querySelectorAll('.metric-value').forEach(v => {
-				const m = v.getAttribute('data-metric');
-				frozen[m] = parseFloat(v.getAttribute('data-value')) || parseFloat(v.textContent) || 0;
-			});
-			localStorage.setItem(frozenKey, JSON.stringify(frozen));
-			// mark submission date
-			localStorage.setItem(submittedKey, todayStr);
-			// disable inputs
-			inputs.forEach(i => i.disabled = true);
-			submitBtn.disabled = true;
-			// visually update metric cards to ensure they show the frozen (already same)
-			metricsRow.querySelectorAll('.metric-value').forEach(v => {
-				const m = v.getAttribute('data-metric');
-				if(typeof frozen[m] !== 'undefined') {
-					v.textContent = formatPred(frozen[m]);
-					v.setAttribute('data-value', frozen[m]);
-				}
-			});
-			// option: redraw graph to reflect locked status
-			drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
-		});
+		// Store plant key and metric for later submission
+		card.setAttribute('data-plant-key', plantKey);
+		card.setAttribute('data-metric', metric);
 
 		// Draw graph for this plant
 		setTimeout(() => {
@@ -2689,6 +2719,60 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 	ctx.fillText(`${info.label} (${info.unit})`, 0, 0);
 	ctx.restore();
 }
+
+/* Show All modal controls */
+function openShowAllModal(plantNum, farmingMethod, metric) {
+	const modal = document.getElementById('showAllModal');
+	const title = document.getElementById('showAllTitle');
+	if(!modal || !title) return;
+	title.textContent = `Plant ${plantNum} — ${metric.toUpperCase()} (${farmingMethod})`;
+
+	const smallCanvas = document.getElementById(`plant-${plantNum}-${farmingMethod}-graph`);
+	if(!smallCanvas || !smallCanvas._dateLabels) {
+		showToast('No historical data available for this plant yet.', 'dangerous');
+		return;
+	}
+
+	const tbody = document.querySelector('#showAllTable tbody');
+	if(!tbody) return;
+	tbody.innerHTML = '';
+
+	const dateLabels = Array.isArray(smallCanvas._dateLabels) ? smallCanvas._dateLabels : [];
+	const actualArr = Array.isArray(smallCanvas._actualData) ? smallCanvas._actualData : [];
+	const predArr = Array.isArray(smallCanvas._predictedData) ? smallCanvas._predictedData : [];
+
+	// Build rows for each date label (support labels as objects with display/iso or simple strings)
+	dateLabels.forEach((lbl, idx) => {
+		const display = (lbl && lbl.display) ? lbl.display : (typeof lbl === 'string' ? lbl : (lbl && lbl.iso ? lbl.iso : ''));
+		const actualVal = (typeof actualArr[idx] !== 'undefined' && actualArr[idx] !== null) ? actualArr[idx] : '';
+		const predVal = (typeof predArr[idx] !== 'undefined' && predArr[idx] !== null) ? predArr[idx] : '';
+
+		const tr = document.createElement('tr');
+		tr.innerHTML = `
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0;">${display}</td>
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${actualVal !== '' ? Number(actualVal).toFixed(1) : '-'}</td>
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${predVal !== '' ? Number(predVal).toFixed(1) : '-'}</td>
+		`;
+		tbody.appendChild(tr);
+	});
+
+	modal.style.display = 'flex';
+}
+
+function closeShowAllModal() {
+	const modal = document.getElementById('showAllModal');
+	const tbody = document.querySelector('#showAllTable tbody');
+	if(modal) modal.style.display = 'none';
+	if(tbody) tbody.innerHTML = '';
+}
+
+// wire modal close buttons
+setTimeout(() => {
+	const closeBtn = document.getElementById('showAllClose');
+	const okBtn = document.getElementById('showAllOk');
+	if(closeBtn) closeBtn.addEventListener('click', closeShowAllModal);
+	if(okBtn) okBtn.addEventListener('click', closeShowAllModal);
+}, 500);
 
 // Comparison Graph Functionality
 let currentDays = 1;
@@ -3307,4 +3391,23 @@ function updateThemeIcon(theme) {
 
 // Initialize theme toggle on page load
 initThemeToggle();
+
+
+// Populate elements with class 'readingvoltage' with a random voltage (mV)
+function populateRandomVoltages() {
+	const els = document.querySelectorAll('.readingvoltage');
+	if (!els || els.length === 0) return;
+	els.forEach(el => {
+		const min = parseFloat(el.dataset.min) || 200; // default min mV
+		const max = parseFloat(el.dataset.max) || 1200; // default max mV
+		const val = Math.random() * (max - min) + min;
+		const formatted = val >= 100 ? val.toFixed(0) : val.toFixed(2);
+		if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = formatted;
+		else el.textContent = formatted + ' mV';
+	});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+	populateRandomVoltages();
+});
 

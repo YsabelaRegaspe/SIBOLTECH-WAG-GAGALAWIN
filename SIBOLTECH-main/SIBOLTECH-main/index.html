@@ -20,6 +20,12 @@
 			<img src="../STLogoFinal2.png" alt="SibolTech" class="brand-logo">
 		</div>
 		
+		<div class="topbar-right">
+			<div id="topbarClock" class="topbar-clock" aria-live="polite">
+				<div id="topbarTime" class="topbar-time">--:--:--</div>
+				<div id="topbarDate" class="topbar-date">----</div>
+			</div>
+		</div>
 	</header>
 
 	<aside id="sidebar" class="sidebar">
@@ -490,24 +496,19 @@
 			</div>
 		</div>
 
-		<!-- Success Modal -->
-		<div id="successModal" class="success-modal" style=" display: none;">
+		<!-- Success Modal for Training -->
+		<div id="successModal" class="success-modal simple-success-modal" style=" display: none;">
 			<div class="success-modal-content">
-				<div class="success-modal-header">
-					<h3>✅ Data Submitted Successfully</h3>
-					<button class="success-close-btn" id="successModalClose">&times;</button>
-				</div>
-				<div class="success-modal-body" id="successModalBody">
-					<!-- Submitted data will be shown here -->
-				</div>
-				<div class="success-modal-footer">
-					<div class="modal-actions-left">
-						<button class="btn-secondary" id="copyDataBtn">Copy Data</button>
-					</div>
-					<div class="modal-actions-right">
-						<button class="success-ok-btn" id="successOkBtn">OK</button>
-					</div>
-				</div>
+				<div class="simple-success-icon">✓</div>
+				<div class="simple-success-text">Successfully Submitted</div>
+			</div>
+		</div>
+
+		<!-- Success Modal for Prediction -->
+		<div id="predictionSuccessModal" class="success-modal simple-success-modal" style=" display: none;">
+			<div class="success-modal-content">
+				<div class="simple-success-text">Successfully Submitted</div>
+				<div class="simple-success-icon">✓</div>
 			</div>
 		</div>
 
@@ -518,6 +519,7 @@
 					<li class="calibrate-tab-btn active aero-dwc-tab-btn" data-sensor="aeroponicssystem">Aeroponics</li>
 					<li class="calibrate-tab-btn aero-dwc-tab-btn" data-sensor="deepwaterculturesystem">Deep Water Culture</li>
 				</ul>
+				<button class="btn submit-all-pred-btn" id="submitAllPredBtn">SUBMIT</button>
 			</div>
 	
 		<div class="prediction-graphs-two-column">
@@ -565,6 +567,7 @@
 								</div>
 							</div>
 						</div>
+						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
 					</div>
 				</div>
 				
@@ -613,6 +616,7 @@
 								</div>
 							</div>
 						</div> 
+						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
 						</div>
 			</div>
 		</div>
@@ -1036,6 +1040,35 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Show All Modal (large chart for full-range view) -->
+		<div id="showAllModal" class="validation-error-modal" style="display: none;">
+			<div class="validation-error-content" style="max-width:1100px;">
+				<div class="validation-error-header">
+					<h3 id="showAllTitle">Plant Data</h3>
+					
+				</div>
+				<div class="validation-error-body" style="padding:12px;">
+					<div class="show-all-table-wrapper" style="height:288px; overflow:auto;">
+						<table id="showAllTable" style="width:100%; border-collapse:collapse;">
+							<thead>
+								<tr style="background:#f7faf7;">
+									<th style="text-align:left; padding:10px; border-bottom:1px solid #e8f0e8;">Date</th>
+									<th style="text-align:right; padding:10px; border-bottom:1px solid #e8f0e8;">Actual</th>
+									<th style="text-align:right; padding:10px; border-bottom:1px solid #e8f0e8;">Predicted</th>
+								</tr>
+							</thead>
+							<tbody>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="validation-error-footer">
+					<button class="validation-ok-btn" id="showAllOk">Close</button>
+				</div>
+			</div>
+		</div>
+
 		<script src="index.js"></script>
 </body>
 

@@ -20,7 +20,127 @@
 .training-tab-btn:hover { color: #2f5f1f; border-color: #5fa63a; }
 
 /* Prediction section header */
-.aero-dwc-header { margin-bottom: 28px; padding-left: 4px; margin-top: 10px; }
+.aero-dwc-header { 
+	margin-bottom: 28px; 
+	padding-left: 4px; 
+	margin-top: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+}
+
+.aero-dwc-header .calibrate-tabs {
+	flex: 1;
+}
+
+.submit-all-pred-btn {
+	background: linear-gradient(180deg, #5fa63a, #3b7a2a);
+	color: #ffffff;
+	border: none;
+	padding: 12px 32px;
+	border-radius: 12px;
+	font-weight: 800;
+	font-size: 14px;
+	cursor: pointer;
+	box-shadow: 0 4px 12px rgba(59, 122, 42, 0.3);
+	transition: all 0.3s ease;
+	white-space: nowrap;
+}
+
+.submit-all-pred-btn:hover {
+	background: linear-gradient(180deg, #6bb844, #4a8a35);
+	box-shadow: 0 6px 16px rgba(59, 122, 42, 0.4);
+	transform: translateY(-2px);
+}
+
+.submit-all-pred-btn:active {
+	transform: translateY(0);
+	box-shadow: 0 2px 8px rgba(59, 122, 42, 0.3);
+}
+
+/* Side-by-side predicted and actual metrics */
+.metrics-row-sidebyside {
+	display: grid !important;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+	padding: 0 12px;
+	margin-bottom: 12px;
+}
+
+.metric-predicted,
+.metric-actual {
+	background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(243, 251, 239, 0.95));
+	border: 2px solid #e3efd9;
+	border-radius: 12px;
+	padding: 14px 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 90px;
+	max-height: 110px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.metric-predicted {
+	border-color: #d4e8c6;
+}
+
+.metric-actual {
+	border-color: #c8e0b8;
+}
+
+.metric-predicted .metric-label {
+	color: #3b7a2a;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.4px;
+	margin-bottom: 8px;
+	text-align: center;
+}
+
+.metric-actual .metric-label {
+	color: #2f5a1f;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.4px;
+	margin-bottom: 8px;
+	text-align: center;
+}
+
+.metric-predicted .metric-value {
+	font-size: 36px;
+	font-weight: 900;
+	color: #184d18;
+	line-height: 1;
+}
+
+.metric-actual .metric-input {
+	width: 100%;
+	max-width: 140px;
+	height: 48px;
+	border: 2px solid #d9edd0;
+	border-radius: 10px;
+	background: #ffffff;
+	padding: 8px 12px;
+	font-size: 28px;
+	font-weight: 700;
+	color: #184d18;
+	text-align: center;
+	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+	transition: all 0.2s ease;
+}
+
+.metric-actual .metric-input:focus {
+	outline: none;
+	border-color: #5fa63a;
+	box-shadow: 0 0 0 3px rgba(95, 166, 58, 0.1), inset 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.metric-actual .metric-input::placeholder {
+	color: #b8d4a8;
+}
 
 .calibrate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 21px; margin-bottom: 30px; margin-top: 40px; }
 .cal-card { background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03)); backdrop-filter: blur(38px); -webkit-backdrop-filter: blur(38px); border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 20px; box-shadow: 0 10px 36px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255, 255, 255, 0.46), inset 0 -1px 0 rgba(0, 0, 0, 0.04); padding: 16px; width: 165%; transition: all 0.3s ease; }
@@ -396,6 +516,98 @@
 /* Prevent horizontal scrolling and make graph/layout responsive */
 html, body { overflow-x: hidden; }
 
+/* Allow horizontal scrolling on narrow viewports so layout remains intact
+	 instead of squeezing everything. The content keeps a sensible min-width
+	 and the page becomes horizontally scrollable on small devices. */
+@media (max-width: 900px) {
+	html, body {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	/* Keep the main content at a readable minimum width so components
+		 don't collapse; users can pan horizontally on small devices. */
+	.main,
+	.dashboard-grid,
+	.training-side-by-side,
+	.prediction-graphs-two-column,
+	.plants-graphs-container {
+		min-width: 900px;
+	}
+
+	/* Ensure specific wide cards that intentionally use larger widths
+		 don't break the layout when viewport is narrow. */
+	.cal-card,
+	.params-card,
+	.plant-graph-card {
+		min-width: 700px;
+	}
+}
+
+/* Calibration-specific responsive fixes: ensure buffer inputs and
+	 calibration values stack and resize on small screens so they don't
+	 force horizontal scrolling. These rules override the min-width
+	 set above just for calibration-related UI. */
+@media (max-width: 900px) {
+	.cal-card,
+	.input-panel,
+	.calibration-cards-row,
+	#inputsContainer,
+	.inputs-grid,
+	.calibration-values,
+	#calibrationValuesColumnPH,
+	#calibrationValuesRowDO {
+		width: 100% !important;
+		min-width: 0 !important;
+		box-sizing: border-box;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	/* Make each input group stack vertically and shrink naturally */
+	.input-group {
+		height: auto !important;
+		padding: 8px !important;
+		display: flex !important;
+		flex-direction: column !important;
+		gap: 8px !important;
+		align-items: stretch !important;
+	}
+
+	/* Ensure numeric inputs and the DO saturation element fill available width */
+	.input-group input,
+	.inputdosaturation,
+	.inputBuffer,
+	.inputVoltage,
+	.inputTemp {
+		width: 100% !important;
+		min-width: 0 !important;
+		height: auto !important;
+		font-size: 16px !important;
+	}
+
+	/* Reduce displayed calibration number sizes to avoid overflow */
+	.cal-values-column .cal-value .value,
+	.calibration-values .value {
+		font-size: 28px !important;
+		line-height: 1.05 !important;
+	}
+
+	/* Keep the Apply button full-width and aligned under inputs */
+	.inputs-grid .btn-apply,
+	.inputs-grid #applyInputs,
+	.inputs-grid #applyInputsDO {
+		width: 100% !important;
+		margin: 6px 0 0 0 !important;
+	}
+
+	/* Ensure the values panel stacks under the input panel cleanly */
+	.calibration-cards-row {
+		flex-direction: column !important;
+		gap: 12px !important;
+	}
+}
+
 /* Ensure sizing uses border-box everywhere to avoid overflow from padding */
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -422,9 +634,36 @@ html, body { overflow-x: hidden; }
 	flex-direction: column !important;
 	align-items: center !important;
 	justify-content: center !important;
+
 }
 
-.input-group-mini { padding-top: 4px; }
+.input-group-mini { 
+	padding-top: 4px;
+	position: relative;
+	overflow: hidden;
+}
+
+.input-group-mini:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 16px rgba(59, 92, 46, 0.12);
+	border-color: #c5dab5;
+}
+
+.input-group-mini::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 3px;
+	background: linear-gradient(90deg, #6ba35a, #8bc34a, #6ba35a);
+	opacity: 0;
+	transition: opacity 0.3s ease;
+}
+
+.input-group-mini:focus-within::before {
+	opacity: 1;
+}
 .input-mini-label { width: 100%; justify-content: center; }
 
 @media (max-width: 900px) {
@@ -2608,6 +2847,35 @@ body.sidebar-collapsed .brand{
     background: rgba(255, 255, 255, 0.25);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+.topbar-right{
+	margin-left: auto;
+	display:flex;
+	align-items:center;
+	gap:12px;
+}
+
+.topbar-clock{
+	display:flex;
+	flex-direction:row;
+	align-items:center;
+	gap:8px;
+	color: #09311a;
+	font-family: 'Poppins', system-ui, Arial;
+}
+
+/* Make time and date sit side-by-side and match `.cal-date` styling */
+.topbar-clock .topbar-time,
+.topbar-clock .topbar-date{
+	font-size: 12px;
+	color: #9aa49a; /* same as .cal-date */
+	font-weight: 600;
+	opacity: 0.95;
+}
+
+.topbar-clock .topbar-time{
+	/* keep compact monospace for time if desired */
+	font-family: 'SFMono-Regular', Consolas, 'Roboto Mono', monospace;
+}
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.4);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -3648,13 +3916,114 @@ body.sidebar-collapsed .brand{
 		box-sizing: border-box;
 	}
 	.input-group-mini{display:flex;flex-direction:column;flex:1;min-width:140px}
-	.input-mini-label{font-size:12px;color:#2f4f1f; margin-bottom:6px;font-weight:700;letter-spacing:0.6px}
+	.input-mini-label{
+		font-size:13px;
+		color:#1f5a1f;
+		margin-bottom:8px;
+		font-weight:600;
+		letter-spacing:0.5px;
+		display:flex;
+		flex-direction:column;
+		align-items:center;
+		text-align:center;
+		padding:6px 8px;
+		background:transparent;
+	}
 	.prediction-input{padding:12px;border-radius:10px;border:1px solid #eef3ea;background:#ffffff;height:44px;font-size:16px}
 	.prediction-panel-actions{margin-left:auto}
 	.btn.submit-pred-btn{background:#ffffff;border:2px solid #7fb86f;padding:8px 20px;border-radius:26px;font-weight:800;color:#153d16}
 	.canvas-legend{margin-top:8px;display:flex;gap:12px}
 	.canvas-hover-tooltip{z-index:9999}
 }
+
+	/* Prediction cards: paired metric layout */
+	.paired-row {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 14px;
+		margin-bottom: 12px;
+	}
+
+	.metric-card.predicted-card,
+	.metric-card.actual-card {
+		background: linear-gradient(135deg, #f6fbf3 0%, #eef6e6 100%);
+		border: 1px solid #d9e8cd;
+		border-radius: 14px;
+		box-shadow: 0 8px 22px rgba(48, 87, 28, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+		padding: 14px 16px;
+		width: 100%;
+		min-width: 0;
+		text-align: left;
+	}
+
+	.metric-card.predicted-card .metric-value { 
+		color: #2d4608; 
+		font-size: 32px; 
+		font-weight: 700;
+		text-align: center;
+		margin-top: 8px;
+	}
+	.metric-card.actual-card { background: linear-gradient(135deg, #ffffff 0%, #f4f9ef 100%); }
+
+	.metric-input-wrapper {
+		width: 100%;
+		margin-top: 8px;
+	}
+
+	.metric-input-wrapper input {
+		display: flex;
+		width: 100%;
+		max-width: 100%;
+		height: 45px;
+		line-height: 44px;
+		border-radius: 5px;
+		border: 1px solid rgba(16, 24, 40, 0.06);
+		background: #fff;
+		padding: 0 8px;
+		font-size: 16px;
+		box-sizing: border-box;
+		box-shadow: inset 0 1px 0 rgba(16, 24, 40, 0.02);
+		text-align: center;
+		color: #2d4608;
+		transition: all 0.2s ease;
+	}
+
+	.metric-card .metric-label {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		text-align: center;
+		margin-bottom: 12px;
+	}
+
+	.metric-card .metric-label .label-prefix {
+		display: inline;
+		font-size: 13px;
+		font-weight: 600;
+		color: #5a7c4a;
+		letter-spacing: 0.5px;
+	}
+
+	.metric-card .metric-label .label-metric {
+		display: inline;
+		font-size: 13px;
+		font-weight: 700;
+		color: #2d4608;
+		letter-spacing: 0.3px;
+	}
+
+	/* Tidy up legacy input panel in static template */
+	.plant-graph-card .prediction-input-panel { display: none; }
+
+	/* Give plant cards a more defined frame */
+	.plant-graph-card {
+		border-radius: 16px;
+		border: 1px solid rgba(76, 117, 60, 0.16);
+		background: linear-gradient(135deg, rgba(248, 253, 247, 0.94), rgba(240, 248, 235, 0.9));
+		box-shadow: 0 10px 28px rgba(59, 92, 46, 0.08);
+	}
 
 .notification .notification-content {
 	display: flex;
@@ -3678,6 +4047,12 @@ body.sidebar-collapsed .brand{
 	-webkit-backdrop-filter: blur(1px);
 }
 
+.notification.success {
+	background: linear-gradient(135deg, rgba(218, 245, 230, 0.4) 0%, rgba(255, 255, 255, 0.18) 100%);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(1px);
+}
+
 .notification.dangerous {
 	background: linear-gradient(135deg, rgba(255, 235, 228, 0.15) 0%, rgba(255, 255, 255, 0.12) 100%);
 	backdrop-filter: blur(5px);
@@ -3689,6 +4064,10 @@ body.sidebar-collapsed .brand{
 	background: rgba(46, 204, 113, 0.12);
 }
 
+.notification.success .notification-icon {
+	background: rgba(46, 204, 113, 0.28);
+}
+
 .notification.dangerous .notification-icon {
 
 	background: rgba(231, 76, 60, 0.12);
@@ -3698,6 +4077,66 @@ body.sidebar-collapsed .brand{
 	box-shadow: 0 16px 38px rgba(0, 0, 0, 0.16);
 }
 
+}
+
+/* Simple Success Modal - Glassmorphism */
+.simple-success-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.2);
+	display: none;
+	justify-content: center;
+	align-items: center;
+	z-index: 3000;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.simple-success-modal .success-modal-content {
+	background: rgba(255, 255, 255, 0.85);
+	-webkit-backdrop-filter: blur(20px);
+	backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.6);
+	border-radius: 24px;
+	padding: 60px 40px;
+	text-align: center;
+	max-width: 320px;
+	box-shadow: 
+		0 8px 32px rgba(31, 90, 31, 0.12),
+		inset 0 1px 1px rgba(255, 255, 255, 0.8),
+		0 0 20px rgba(76, 175, 80, 0.1);
+	animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.simple-success-icon {
+	font-size: 90px;
+	color: #4CAF50;
+	margin-bottom: 24px;
+	font-weight: bold;
+	text-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+	line-height: 1;
+}
+
+.simple-success-text {
+	font-size: 26px;
+	font-weight: 700;
+	color: #1f5a1f;
+	letter-spacing: 0.6px;
+	background: linear-gradient(135deg, #1f5a1f 0%, #2d8a2d 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+@keyframes slideInUp {
+	from {
+		opacity: 0;
+		transform: translateY(40px) scale(0.9);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
 }
 
 /* Modal Styles */
@@ -3802,6 +4241,29 @@ body.sidebar-collapsed .brand{
 	transition: all 0.3s ease;
 }
 
+/* position context for the show-all button */
+.plant-graph-card { position: relative; }
+
+.show-all-btn {
+	position: absolute;
+	right: 18px;
+	bottom: 18px;
+	background: #ffffff;
+	color: #2e7d32;
+	border: 1px solid rgba(46,125,50,0.12);
+	padding: 10px 18px;
+	border-radius: 999px;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: 0 8px 24px rgba(46,125,50,0.06), inset 0 1px 0 rgba(255,255,255,0.6);
+	transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.show-all-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 36px rgba(46,125,50,0.10); }
+
+@media (max-width: 900px) {
+	.show-all-btn { right: 12px; bottom: 12px; padding: 8px 14px; }
+}
+
 .plant-graph-card:hover {
 	transform: translateY(-3px);
 	background: rgba(255, 255, 255, 0.25);
@@ -3896,6 +4358,17 @@ body.sidebar-collapsed .brand{
 	min-height: 60px;
 	max-height: 420px;
 	overflow-y: auto;
+}
+
+/* Show-all table tweaks: fixed visible rows (6) and sticky header */
+#showAllTable thead th {
+	position: sticky;
+	top: 0;
+	background: #f7faf7;
+	z-index: 2;
+}
+#showAllTable tbody tr {
+	height: 48px;
 }
 
 .success-modal-body {
