@@ -81,41 +81,12 @@
 
 		if (!toggle) return;
 
-		toggle.addEventListener('change', () => {
-			const isChecked = toggle.checked;
-			if (toggleText) toggleText.textContent = isChecked ? 'ON' : 'OFF';
-			config.sections.forEach(id => {
-				const el = document.getElementById(id);
-				if (el) {
-					if (id.includes('ModeSection')) el.style.display = isChecked ? 'flex' : 'none';
-					else el.style.display = isChecked ? 'block' : 'none';
-				}
-			});
-			
-			// When turning ON, reset inputs to clear previous data
-			if (isChecked) {
-				resetInputs(sensorType);
-			} 
-			// When turning OFF, clear all input data and reset state
-			else {
-				state[sensorType].data = [];
-				state[sensorType].currentPoint = 1;
-			}
-		});
-	}
-
-	function resetInputs(sensorType) {
-		const config = sensorConfigs[sensorType];
+		const sensorState = state[sensorType] || { mode: '1', currentPoint: 1, data: [] };
 		const container = document.getElementById(config.containerId);
 		if (!container) return;
 
-		state[sensorType].currentPoint = 1;
-		state[sensorType].data = [];
+		const applyBtnHtml = sensorState.mode === '1' ? '' : `<button class="btn btn-apply" id="${config.applyBtnId}">Apply</button>`;
 
-		const sensorState = state[sensorType];
-		const isOnePoint = sensorState.mode === '1';
-		const applyBtnHtml = !isOnePoint ? `<button class="btn btn-apply" id="${config.applyBtnId}">Apply</button>` : '';
-		
 		let specialInputHtml = '';
 		if (sensorType === 'do') {
 			const satValue = sensorState.mode === '2' ? '0' : '100';
@@ -147,6 +118,8 @@
 				${applyBtnHtml}
 			</div>
 		`;
+
+		if (toggleText) toggleText.textContent = (toggle.checked ? 'ON' : 'OFF');
 	}
 
 	function addInputRow(sensorType, pointNum) {
@@ -257,7 +230,13 @@
 	const calDate = document.getElementById('calDate');
 	if (calDate) {
 		const now = new Date();
-		calDate.textContent = `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString()}`;
+		const formatted = `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${now.toLocaleDateString()}`;
+		calDate.textContent = formatted;
+		// also set DO and TDS calibration date labels if present
+		const calDateDO = document.getElementById('calDateDO');
+		if (calDateDO) calDateDO.textContent = formatted;
+		const calDateTDS = document.getElementById('calDateTDS');
+		if (calDateTDS) calDateTDS.textContent = formatted;
 	}
 
 	// Initialize sensors
@@ -283,20 +262,34 @@
 		const container = document.getElementById(config.containerId);
 		if (container) {
 			container.addEventListener('click', (e) => {
-				const btn = e.target;
-				const isApply = btn.classList.contains('btn-apply') || btn.id.includes('applyInputs');
-				const isEdit = btn.classList.contains('btn-edit') || btn.id.includes('editInputs');
-
-				if (!isApply && !isEdit) return;
+				// ensure we get the button element even if an inner node was clicked
+				const btn = e.target.closest && e.target.closest('button');
+				const isApply = btn && (btn.classList.contains('btn-apply') || btn.id.includes('applyInputs'));
+				if (!isApply) return;
 
 				const grid = btn.closest('.inputs-grid');
 				const pointNum = parseInt(grid.getAttribute('data-point'));
 				const inputs = grid.querySelectorAll('input');
 
-				if (isApply) {
+				// Target calibration inputs only
+				const targetSel = `.${config.inputClass}, .inputVoltage, .inputTemp`;
+				const targetInputs = grid.querySelectorAll(targetSel);
+
+				// Determine current state: if target inputs are disabled => currently applied state
+				const anyDisabled = Array.from(targetInputs).some(i => i.disabled);
+
+				if (anyDisabled) {
+					// Currently applied -> enable calibration inputs for editing
+					targetInputs.forEach(i => i.disabled = false);
+					// Hide calibration values section while editing
+					const valSection = document.getElementById(config.sections[2]);
+					if (valSection) valSection.style.display = 'none';
+					// Keep button text as 'Apply'
+				} else {
+					// Currently editable -> Apply: validate, save, then disable calibration inputs
 					let allFilled = true;
-					inputs.forEach(i => { if (!i.value.trim()) allFilled = false; });
-					
+					targetInputs.forEach(i => { if (!i.value.trim()) allFilled = false; });
+
 					if (!allFilled && state[sensorType].mode !== '1') {
 						showValidationModal('Please fill in all values before applying.');
 						return;
@@ -318,34 +311,18 @@
 					if (existingIdx >= 0) state[sensorType].data[existingIdx] = dataPoint;
 					else state[sensorType].data.push(dataPoint);
 
-					inputs.forEach(i => i.disabled = true);
-					btn.textContent = 'Edit';
-					btn.classList.remove('btn-apply');
-					btn.classList.add('btn-edit');
+					// disable only calibration fields
+					targetInputs.forEach(i => i.disabled = true);
 
 					// Show calibration values section only if all required points are completed
 					const requiredPoints = parseInt(state[sensorType].mode);
 					const completedPoints = state[sensorType].data.length;
-					
 					if (completedPoints >= requiredPoints) {
 						const valSection = document.getElementById(config.sections[2]);
 						if (valSection) valSection.style.setProperty('display', 'block', 'important');
 					}
 					const inputPanel = document.getElementById(config.sections[1]);
 					if (inputPanel) inputPanel.style.setProperty('display', 'block', 'important');
-				} else {
-					inputs.forEach(i => i.disabled = false);
-					btn.textContent = 'Apply';
-					btn.classList.remove('btn-edit');
-					btn.classList.add('btn-apply');
-					
-					// Hide calibration values section when editing
-					const valSection = document.getElementById(config.sections[2]);
-					if (valSection) valSection.style.display = 'none';
-					
-					// Remove the data point from state
-					const existingIdx = state[sensorType].data.findIndex(d => d.point === pointNum);
-					if (existingIdx >= 0) state[sensorType].data.splice(existingIdx, 1);
 				}
 			});
 		}
@@ -398,6 +375,101 @@
 		}
 
 		// Clear button
+
+		// --- Training tab switching (show/hide farming method cards) ---
+		(function initTrainingTabs(){
+			const training = document.getElementById('training');
+			if (!training) return;
+
+			const tabBtns = training.querySelectorAll('.calibrate-tab-btn');
+			const aeroCard = training.querySelector('.aeroponics-params');
+			const dwcCard = training.querySelector('.dwc-params');
+			const tradCard = training.querySelector('.traditional-params');
+
+			function showOnly(card) {
+				[aeroCard, dwcCard, tradCard].forEach(c => {
+					if (!c) return;
+					c.style.display = (c === card) ? 'block' : 'none';
+				});
+
+				// Inline actions sit in the right column; show them only when DWC is visible
+				const inlineActions = training.querySelector('.right-cards-container .inline-actions');
+				if (inlineActions) inlineActions.style.display = (card === dwcCard) ? 'flex' : 'none';
+			}
+
+			tabBtns.forEach(btn => {
+				btn.addEventListener('click', () => {
+					tabBtns.forEach(b => b.classList.remove('active'));
+					btn.classList.add('active');
+					const sensor = btn.getAttribute('data-sensor');
+					if (sensor === 'ph') showOnly(aeroCard);
+					else if (sensor === 'do') showOnly(dwcCard);
+					else if (sensor === 'tds') showOnly(tradCard);
+				});
+			});
+
+			// Initialize: click the active button or first button to set initial visibility
+			const initial = training.querySelector('.calibrate-tab-btn.active') || tabBtns[0];
+			if (initial) initial.click();
+		})();
+
+		// --- Training section buttons (new `.training-tab-btn`) ---
+		(function initTrainingTabButtons(){
+			const training = document.getElementById('training');
+			if (!training) return;
+
+			const tabBtns = training.querySelectorAll('.training-tab-btn');
+			if (!tabBtns.length) return;
+
+			const leftContainer = training.querySelector('.left-cards-container');
+			const rightContainer = training.querySelector('.right-cards-container');
+			const aeroCard = training.querySelector('.aeroponics-params');
+			const dwcCard = training.querySelector('.dwc-params');
+			const tradCard = training.querySelector('.traditional-params');
+			const inlineActions = leftContainer ? leftContainer.querySelector('.inline-actions') : null;
+
+			function showAeroView(){
+				if (leftContainer) leftContainer.style.display = 'block';
+				if (rightContainer) rightContainer.style.display = 'none';
+				if (aeroCard) aeroCard.style.display = 'block';
+				if (tradCard) tradCard.style.display = 'none';
+				if (dwcCard) dwcCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'none';
+			}
+
+			function showDwcView(){
+				if (leftContainer) leftContainer.style.display = 'none';
+				if (rightContainer) rightContainer.style.display = 'block';
+				if (dwcCard) dwcCard.style.display = 'block';
+				if (aeroCard) aeroCard.style.display = 'none';
+				if (tradCard) tradCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'none';
+			}
+
+			function showTradView(){
+				if (leftContainer) leftContainer.style.display = 'block';
+				if (rightContainer) rightContainer.style.display = 'none';
+				if (aeroCard) aeroCard.style.display = 'none';
+				if (tradCard) tradCard.style.display = 'block';
+				if (dwcCard) dwcCard.style.display = 'none';
+				if (inlineActions) inlineActions.style.display = 'flex';
+			}
+
+			tabBtns.forEach(btn => {
+				btn.addEventListener('click', () => {
+					tabBtns.forEach(b => b.classList.remove('active'));
+					btn.classList.add('active');
+					const sensor = btn.getAttribute('data-sensor');
+					if (sensor === 'training-aero') showAeroView();
+					else if (sensor === 'training-dwc') showDwcView();
+					else if (sensor === 'training-trad') showTradView();
+				});
+			});
+
+			// Initialize view
+			const initial = training.querySelector('.training-tab-btn.active') || tabBtns[0];
+			if (initial) initial.click();
+		})();
 		const clearBtn = document.getElementById(`clearCal${sensorType === 'ph' ? '' : sensorType.toUpperCase()}`);
 		if (clearBtn) {
 			clearBtn.addEventListener('click', () => {
@@ -591,6 +663,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			sidebar.classList.toggle('collapsed');
 			// Add/remove body class for global styling adjustments
 			document.body.classList.toggle('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+			
+			// Close dropdown menu when sidebar is collapsed
+			if(sidebar.classList.contains('collapsed')) {
+				const predictionItem = document.querySelector('.sidebar-dropdown');
+				if(predictionItem) {
+					predictionItem.classList.remove('open');
+				}
+			}
 		}
 	});
 
@@ -605,6 +685,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			// Special handling for prediction tab - toggle dropdown
 			const predictionItem = document.querySelector('.sidebar-dropdown');
+			const historyItem = document.querySelector('.sidebar-dropdown1');
 			if(t === 'predicting') {
 				if(predictionItem) {
 					const isOpen = predictionItem.classList.toggle('open');
@@ -625,11 +706,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 				return;
 			}
-			
-			// Close prediction dropdown when switching to other tabs
-			if(t !== 'predicting' && predictionItem) {
-				predictionItem.classList.remove('open');
+
+			// Special handling for history tab - toggle dropdown
+			if(t === 'history') {
+				if(historyItem) {
+					const isOpen = historyItem.classList.toggle('open');
+					if(isOpen) {
+						document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
+						a.classList.add('active');
+						contents.forEach(c=>c.classList.remove('active'));
+						const target = document.getElementById(t);
+						if(target) target.classList.add('active');
+						// mark first history subitem active
+						document.querySelectorAll('.history').forEach(h => h.classList.remove('active'));
+						document.querySelector('.history')?.classList.add('active');
+					}
+				}
+				return;
 			}
+			
+			// Close prediction and history dropdowns when switching to other tabs
+			if(t !== 'predicting' && predictionItem) predictionItem.classList.remove('open');
+			if(t !== 'history' && historyItem) historyItem.classList.remove('open');
 			
 			document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
 			a.classList.add('active');
@@ -669,19 +767,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		const updateHistoryEmpty = () => {
 			if (!historyEmptyCell) return;
-			const methodLabel = historyBoard.querySelector('.history-tab-btn.active')?.textContent?.trim() || 'Aeroponics';
+			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
 			const intervalLabel = historyBoard.querySelector('.history-chip.active')?.textContent?.trim() || 'Daily';
 			const plantLabel = historyBoard.querySelector('.history-pill.active')?.textContent?.trim() || '1';
 			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
 		};
 
-		historyBoard.querySelectorAll('.history-tab-btn').forEach(btn => {
-			btn.addEventListener('click', () => {
-				historyBoard.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				historyBoard.querySelectorAll('[data-history-tab]').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
+				// Toggle history table views based on selected method
+				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+					if (w.getAttribute('data-history-view') === view) w.style.display = '';
+					else w.style.display = 'none';
+				});
 			});
+		});
+
+		// Initialize view visibility
+		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+			const view = historyState.method === 'trad' ? 'plant' : 'sensor';
+			if (w.getAttribute('data-history-view') === view) w.style.display = '';
+			else w.style.display = 'none';
 		});
 
 		historyBoard.querySelectorAll('.history-pill').forEach(pill => {
@@ -703,6 +815,61 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		});
 
 		updateHistoryEmpty();
+
+		// Sidebar history menu (Plant / Actuator) click handlers
+		const sidebarHistoryItems = document.querySelectorAll('#historyMenu .history');
+		if(sidebarHistoryItems && sidebarHistoryItems.length) {
+			sidebarHistoryItems.forEach(item => {
+				item.addEventListener('click', (e) => {
+					e.preventDefault();
+					const metric = item.getAttribute('data-metric'); // 'Plant' or 'Actuator'
+					// Do not navigate to other tabs or dashboard when submenu items are clicked.
+					// Update history board view in-place instead.
+					if (metric && metric.toLowerCase().includes('actuator')) {
+						// When Actuator submenu is clicked, open History and show the sensor/history table.
+						const historyAnchor = document.querySelector('[data-tab="history"]');
+						if (historyAnchor) {
+							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
+							historyAnchor.classList.add('active');
+							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+							const histSec = document.getElementById('history');
+							if (histSec) histSec.classList.add('active');
+						}
+						// Show sensor view (the main history table with sensor+plant columns)
+						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
+							else w.style.display = 'none';
+						});
+					} else if (metric && metric.toLowerCase() === 'plant') {
+						// Ensure History tab is active
+						const historyAnchor = document.querySelector('[data-tab="history"]');
+						if (historyAnchor) {
+							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
+							historyAnchor.classList.add('active');
+							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+							const histSec = document.getElementById('history');
+							if (histSec) histSec.classList.add('active');
+						}
+
+						// Always show both sensor and plant table views together
+						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+							w.style.display = '';
+						});
+					} else {
+						// Other metrics: show sensor view by default
+						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
+							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
+							else w.style.display = 'none';
+						});
+					}
+					// Update active state for sidebar items
+					sidebarHistoryItems.forEach(s => s.classList.remove('active'));
+					item.classList.add('active');
+					// Update empty message if needed
+					updateHistoryEmpty();
+				});
+			});
+		}
 	}
 
 	// Prediction dropdown option click handlers
@@ -710,10 +877,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		option.addEventListener('click', (e) => {
 			e.preventDefault();
 			const metric = option.getAttribute('data-metric');
-			// Update active state (just mark it, don't generate yet)
+			// Update active state
 			document.querySelectorAll('.prediction-option').forEach(opt => opt.classList.remove('active'));
 			option.classList.add('active');
-			// Don't auto-generate - wait for user to click method button
+			
+			// Generate graphs immediately with current farming method
+			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			generatePlantGraphs(metric, selectedMethod);
+			
 			// Close mobile sidebar if open
 			if(window.innerWidth <= 900) sidebar.classList.remove('open');
 		});
@@ -1161,20 +1332,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		showThresholdModal(sensorType);
 	}, true);
 
-	// Helper function to update sensor alert
+	// Helper function to update all sensor alerts (dashboard, training, etc.)
 	function updateSensorAlert(sensorType, value){
-		const alertEl = document.getElementById(`alert-${sensorType}`);
-		if(!alertEl) return;
-
 		const {status, statusClass} = getSensorStatus(sensorType, value);
-		alertEl.textContent = status;
-		alertEl.className = `alert ${statusClass}`;
+		document.querySelectorAll(`[id="alert-${sensorType}"]`).forEach(alertEl => {
+			alertEl.textContent = status;
+			alertEl.className = `alert ${statusClass}`;
+		});
 
 		// Only show notifications for warning (normal) and critical (dangerous), not optimal (neutral)
 		if(statusClass !== 'neutral'){
 			showNotification(sensorType, value, status, statusClass);
 		}
 	}
+
+	let actuatorOverride = false;
 
 	function updateSensorsAndActuators(){
 		// sample values - replace with real sensor API later
@@ -1185,11 +1357,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
 		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
 		
-		document.getElementById('val-ph').textContent = phValue;
-		document.getElementById('val-do').textContent = doValue;
-		document.getElementById('val-temp').textContent = tempValue;
-		document.getElementById('val-hum').textContent = humValue;
-		document.getElementById('val-tds').textContent = tdsValue;
+		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
+		const setValueAll = (key, val) => {
+			document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
+		};
+		setValueAll('ph', phValue);
+		setValueAll('do', doValue);
+		setValueAll('temp', tempValue);
+		setValueAll('hum', humValue);
+		setValueAll('tds', tdsValue);
 
 		// Record values for sensor graphs time series
 		recordSensorValue('ph', parseFloat(phValue));
@@ -1205,35 +1381,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - use helper to set class + text
-		setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
-		setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
-		// Track both exhaust fans separately (in/out)
-		setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
-		setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
-		setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		// actuators - only auto-adjust when override is OFF
+		if(!actuatorOverride){
+			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
+			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
+			// Track both exhaust fans separately (in/out)
+			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
+			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+		}
 	}
 
-	// helper: set actuator state text + class
+	// helper: set actuator state text + checkbox
 	function setActuatorState(id, state){
-		const el = document.getElementById(id);
-		if(!el) return;
-		el.textContent = state;
-		el.classList.remove('on','off');
-		if(state === 'ON') el.classList.add('on'); else el.classList.add('off');
+		const checkbox = document.getElementById(id);
+		if(!checkbox) return;
+		const label = checkbox.closest('.toggle-switch');
+		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		
+		checkbox.checked = (state === 'ON');
+		if(toggleText) toggleText.textContent = state;
 	}
 
-	// make actuator rows clickable to toggle
-	document.querySelectorAll('.actuators .act').forEach(actEl=>{
-		actEl.addEventListener('click', ()=>{
-			const span = actEl.querySelector('.state');
-			if(!span || !span.id) return;
-			const current = span.textContent.trim();
-			const next = current === 'ON' ? 'OFF' : 'ON';
-			setActuatorState(span.id, next);
+	// Add event listeners to actuator toggles to update text
+	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			const label = checkbox.closest('.toggle-switch');
+			const toggleText = label ? label.querySelector('.toggle-text') : null;
+			if(toggleText) {
+				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
+			}
 		});
 	});
+
+	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	const overrideToggle = document.getElementById('actuatorOverrideToggle');
+	if(overrideToggle){
+		const updateOverrideState = () => {
+			const label = overrideToggle.closest('.toggle-switch');
+			const textEl = label ? label.querySelector('.toggle-text') : null;
+			actuatorOverride = overrideToggle.checked;
+			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+		};
+		overrideToggle.addEventListener('change', updateOverrideState);
+		updateOverrideState();
+	}
 
 	// Nutrient solution quick actions
 	function showNutrientNotification(label){
@@ -1260,7 +1453,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const actions = [
 			{ id: 'btn-ph-up', label: 'pH Up' },
 			{ id: 'btn-ph-down', label: 'pH Down' },
-			{ id: 'btn-leafy-green', label: 'Leafy Green' }
+			{ id: 'btn-leafy-green', label: 'Leafy Green' },
+			{ id: 'btn-misting-pump', label: 'Misting Pump' }
 		];
 
 		actions.forEach(action => {
@@ -1282,6 +1476,110 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	}
 
 	setupNutrientButtons();
+
+	// Helper to show prediction success modal
+	function showPredictionSuccessModal() {
+		const modal = document.getElementById('predictionSuccessModal');
+		if(modal) {
+			modal.style.display = 'flex';
+			// Auto-close after 2 seconds
+			setTimeout(() => {
+				if(modal.style.display === 'flex') {
+					modal.style.display = 'none';
+				}
+			}, 2000);
+		}
+	}
+
+	function closePredictionSuccessModal() {
+		const modal = document.getElementById('predictionSuccessModal');
+		if(modal) modal.style.display = 'none';
+	}
+
+	// Global submit handler for prediction section
+	const submitAllPredBtn = document.getElementById('submitAllPredBtn');
+	if(submitAllPredBtn) {
+		submitAllPredBtn.addEventListener('click', () => {
+			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			const containerId = selectedMethod === 'aeroponics' ? 'plantsGraphsContainer-aeroponics' : 'plantsGraphsContainer-dwc';
+			const container = document.getElementById(containerId);
+			if(!container) return;
+
+			const cards = container.querySelectorAll('.plant-graph-card');
+			const todayStr = new Date().toISOString().slice(0,10);
+			let hasEmptyInputs = false;
+
+			cards.forEach(card => {
+				const inputs = card.querySelectorAll('.prediction-input');
+				inputs.forEach(input => {
+					if(!input.value || input.value.trim() === '') {
+						hasEmptyInputs = true;
+					}
+				});
+			});
+
+			if(hasEmptyInputs) {
+				showToast('Please fill in all actual values before submitting.', 'dangerous');
+				return;
+			}
+
+			// Process all cards
+			cards.forEach(card => {
+				const plantKey = card.getAttribute('data-plant-key');
+				const metric = card.getAttribute('data-metric');
+				if(!plantKey || !metric) return;
+
+				const inputs = card.querySelectorAll('.prediction-input');
+				const payload = {};
+				inputs.forEach(i => {
+					const m = i.getAttribute('data-metric');
+					payload[m] = i.value ? parseFloat(i.value) : null;
+				});
+
+				// store actuals
+				const actualsKey = `plant_${plantKey}_actuals`;
+				localStorage.setItem(actualsKey, JSON.stringify(payload));
+				Object.entries(payload).forEach(([metricName, val]) => {
+					const perMetricKey = `plant_${plantKey}_${metricName}_actual`;
+					if(val !== null && val !== undefined && !Number.isNaN(val)) {
+						localStorage.setItem(perMetricKey, String(val));
+					} else {
+						localStorage.removeItem(perMetricKey);
+					}
+				});
+
+				// freeze predicted values
+				const frozen = {};
+				const metricsRow = card.querySelector('.metrics-row');
+				metricsRow.querySelectorAll('.metric-value').forEach(v => {
+					const m = v.getAttribute('data-metric');
+					frozen[m] = parseFloat(v.getAttribute('data-value')) || parseFloat(v.textContent) || 0;
+				});
+				const frozenKey = `plant_${plantKey}_frozenPreds`;
+				localStorage.setItem(frozenKey, JSON.stringify(frozen));
+				
+				// mark submission date
+				const submittedKey = `plant_${plantKey}_${metric}_submittedDate`;
+				localStorage.setItem(submittedKey, todayStr);
+
+				// disable inputs
+				inputs.forEach(i => i.disabled = true);
+
+				// redraw graph
+				const canvas = card.querySelector('.plant-graph-canvas');
+				if(canvas) {
+					const plantNum = parseInt(plantKey.split('-')[1]);
+					drawPlantGraph(canvas.id, metric, plantNum, selectedMethod);
+				}
+			});
+
+			// Show success modal with submitted data
+			showPredictionSuccessModal();
+			showToast('All predictions submitted successfully!', 'success');
+		});
+	}
+
+	// Prediction success modal closes automatically - no click handlers needed
 
 	// initial draw and periodic updates - wait a bit for layout to settle
 	setTimeout(() => {
@@ -1320,6 +1618,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			drawComparisonGraph();
 		});
 	});
+
+	// Metric button handlers (height, width, length, leaves, branches)
+	const metricButtons = document.querySelectorAll('.metric-btn');
+	metricButtons.forEach(btn => {
+		btn.addEventListener('click', () => {
+			metricButtons.forEach(b => b.classList.remove('active'));
+			btn.classList.add('active');
+			currentMetric = btn.getAttribute('data-metric') || 'height';
+			drawComparisonGraph();
+		});
+	});
+
+// Topbar clock: update date and time every second
+function updateTopbarClock() {
+	const timeEl = document.getElementById('topbarTime');
+	const dateEl = document.getElementById('topbarDate');
+	if(!timeEl || !dateEl) return;
+	const now = new Date();
+	const hh = String(now.getHours()).padStart(2,'0');
+	const mm = String(now.getMinutes()).padStart(2,'0');
+	const ss = String(now.getSeconds()).padStart(2,'0');
+	timeEl.textContent = `${hh}:${mm}:${ss}`;
+	// Build a richer date display: short weekday, short month+day, and year
+	const weekday = now.toLocaleDateString(undefined, { weekday: 'short' }); // e.g. "Thu"
+	const monthDay = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // e.g. "Jan 16"
+	const year = now.getFullYear();
+	dateEl.innerHTML = `
+		<span class="tb-weekday">${weekday}</span>
+		<span class="tb-monthday">${monthDay}</span>
+		<span class="tb-year">${year}</span>
+	`;
+	// tooltip with full localized datetime
+	dateEl.title = now.toLocaleString();
+}
+
+// start clock after DOM ready
+setTimeout(() => {
+	updateTopbarClock();
+	setInterval(updateTopbarClock, 1000);
+}, 200);
 
 	// Traditional Farming: Add plant row handler
 	const addTraditionalPlantBtn = document.getElementById('addTraditionalPlant');
@@ -1678,84 +2016,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	// Success modal handlers
 	function showSuccessModal(submittedData) {
 		const modal = document.getElementById('successModal');
-		const body = document.getElementById('successModalBody');
-		
-		if (modal && body) {
-			// Format the submitted data for display
-			let htmlContent = '<div style="font-size: 14px; line-height: 1.8;">';
-			
-			// Sensor Readings
-			const sensorCard = document.querySelector('[data-sensor="all"]');
-			if (sensorCard) {
-				htmlContent += '<strong>Sensor Readings:</strong><br>';
-				const fields = ['ph', 'do', 'tds', 'temp', 'hum'];
-				fields.forEach(field => {
-					const input = sensorCard.querySelector(`[data-field="${field}"]`);
-					if (input && input.value) {
-						const label = input.closest('.sensor-input-label').querySelector('.sensor-label-text').textContent;
-						const unit = input.closest('.sensor-input-label').querySelector('.sensor-unit').textContent;
-						htmlContent += `${label}: ${input.value} ${unit}<br>`;
-					}
-				});
-				htmlContent += '<br>';
-			}
-
-			// Traditional Farming
-			const traditionalList = document.getElementById('traditionalPlantsList');
-			if (traditionalList) {
-				const rows = traditionalList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Traditional Farming:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-					htmlContent += '<br>';
-				}
-			}
-
-			// DWC
-			const dwcList = document.getElementById('dwcPlantsList');
-			if (dwcList) {
-				const rows = dwcList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Deep Water Culture:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-					htmlContent += '<br>';
-				}
-			}
-
-			// Aeroponics
-			const aeroList = document.getElementById('aeroponicsPlantsList');
-			if (aeroList) {
-				const rows = aeroList.querySelectorAll('.sensor-inputs-row1');
-				if (rows.length > 0) {
-					htmlContent += '<strong>Aeroponics:</strong><br>';
-					rows.forEach((row, idx) => {
-						const height = row.querySelector('[data-field="height"]')?.value || '-';
-						const length = row.querySelector('[data-field="length"]')?.value || '-';
-						const width = row.querySelector('[data-field="width"]')?.value || '-';
-						const leaves = row.querySelector('[data-field="leaves"]')?.value || '-';
-						const branches = row.querySelector('[data-field="branches"]')?.value || '-';
-						htmlContent += `Plant ${idx + 1}: H=${height}, L=${length}, W=${width}, Leaves=${leaves}, Branches=${branches}<br>`;
-					});
-				}
-			}
-
-			htmlContent += '</div>';
-			body.innerHTML = htmlContent;
+		if (modal) {
 			modal.style.display = 'flex';
+			// Auto-close after 2 seconds
+			setTimeout(() => {
+				if(modal.style.display === 'flex') {
+					modal.style.display = 'none';
+					clearAllFields();
+				}
+			}, 2000);
 		}
 	}
 
@@ -1796,6 +2065,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		// Show success modal
 		showSuccessModal(data);
+		showToast('Data submitted successfully!', 'success');
 	}
 
 	function clearAllFields() {
@@ -1858,32 +2128,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		});
 	}
 
-	// Success modal event listeners
-	const successCloseBtn = document.getElementById('successModalClose');
-	if (successCloseBtn) {
-		successCloseBtn.addEventListener('click', () => {
-			closeSuccessModal();
-			clearAllFields();
-		});
-	}
-
-	const successOkBtn = document.getElementById('successOkBtn');
-	if (successOkBtn) {
-		successOkBtn.addEventListener('click', () => {
-			closeSuccessModal();
-			clearAllFields();
-		});
-	}
-
-	const successModal = document.getElementById('successModal');
-	if (successModal) {
-		successModal.addEventListener('click', (e) => {
-			if (e.target === successModal) {
-				closeSuccessModal();
-				clearAllFields();
-			}
-		});
-	}
+	// Success modal closes automatically - no click handlers needed
 
 	// Calibration apply
 	const applyCal = document.getElementById('applyCal');
@@ -1907,7 +2152,7 @@ const metricInfo = {
 		description: 'Predicted leaf count based on growth model for all plants.'
 	},
 	width: { 
-		label: 'width', 
+		label: 'Width', 
 		unit: 'cm', 
 		range: [0.5, 3.5], 
 		description: 'Estimated plant width over time for all plants.'
@@ -1931,6 +2176,78 @@ const metricInfo = {
 		description: 'Forecasted branch count for all plants.'
 	}
 };
+
+// Helper: deterministic pseudo-random predicted value per metric/plant/day
+function computePredictedValue(metric, plantNum, dateStr) {
+	const info = metricInfo[metric];
+	if(!info) return 0;
+	const seed = `${metric}:${plantNum}:${dateStr}`;
+	let s = 0;
+	for(let i=0;i<seed.length;i++) s = (s * 31 + seed.charCodeAt(i)) & 0xffffffff;
+	// map s to 0..1
+	const frac = (s >>> 0) / 4294967295;
+	const [minVal, maxVal] = info.range;
+	return minVal + frac * (maxVal - minVal);
+}
+
+function formatPred(val) {
+	return Number.isFinite(val) ? Number(val).toFixed(1) : '--';
+}
+
+// Generate an array of date labels starting from `startDateStr` (ISO yyyy-mm-dd) for `count` days
+function generateDateLabels(startDateStr, count) {
+	const labels = [];
+	const date = new Date(startDateStr + 'T00:00:00');
+	// Shift displayed dates forward one day (user preference): Jan 15 -> Jan 16, etc.
+	for (let i = 0; i < count; i++) {
+		const d = new Date(date.getTime());
+		d.setDate(date.getDate() + i + 1);
+		const opts = { month: 'short', day: 'numeric' };
+		labels.push({ iso: d.toISOString().slice(0,10), display: d.toLocaleDateString(undefined, opts) });
+	}
+	return labels;
+}
+
+// Show an in-page toast notification using the #notificationContainer element
+function showToast(message, type = 'neutral', timeout = 4000) {
+	const container = document.getElementById('notificationContainer');
+	if(!container) return;
+	const icon = type === 'dangerous' ? '⚠️' : (type === 'success' ? '✅' : 'ℹ️');
+	const note = document.createElement('div');
+	note.className = `notification show ${type}`;
+	note.innerHTML = `
+		<div class="notification-icon">${icon}</div>
+		<div class="notification-content">${message}</div>
+		<button class="notification-close" aria-label="close">&times;</button>
+	`;
+	container.appendChild(note);
+	const closeBtn = note.querySelector('.notification-close');
+	if(closeBtn) {
+		closeBtn.addEventListener('click', () => note.remove());
+	}
+	setTimeout(() => { if(note.parentNode) note.remove(); }, timeout);
+}
+
+// Delegate submit clicks for static or dynamically generated submit buttons.
+document.addEventListener('click', function(e) {
+	const btn = e.target.closest && e.target.closest('.submit-pred-btn');
+	if(!btn) return;
+	// find the parent plant card and its prediction input panel
+	const card = btn.closest('.plant-graph-card');
+	const panel = card ? card.querySelector('.prediction-input-panel') : null;
+	const inputs = panel ? panel.querySelectorAll('input.prediction-input') : [];
+	if(inputs.length === 0) return; // nothing to validate here
+	let allFilled = true;
+	inputs.forEach(i => { if(!i.value || String(i.value).trim() === '') allFilled = false; });
+	if(!allFilled) {
+		// show the in-page notification and stop further handlers
+		showToast('Please fill in all actual values before submitting.', 'dangerous');
+		e.preventDefault();
+		e.stopPropagation();
+		return;
+	}
+	// otherwise allow existing handlers (if any) to proceed
+});
 
 function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 	const containerId = farmingMethod === 'aeroponics' ? 'plantsGraphsContainer-aeroponics' : 'plantsGraphsContainer-dwc';
@@ -1994,21 +2311,134 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 	plantData.forEach(plant => {
 		const card = document.createElement('div');
 		card.className = 'plant-graph-card';
-		
+
 		const header = document.createElement('div');
 		header.className = 'card-header';
 		header.textContent = `Plant ${plant.plantNum}`;
-		
+
+		// Metrics row (side-by-side predicted and actual)
+		const metricsRow = document.createElement('div');
+		metricsRow.className = 'metrics-row metrics-row-sidebyside';
+
+		// Show only the currently selected metric on the card/input panel
+		const metricsList = [metric];
+		const todayStr = new Date().toISOString().slice(0,10);
+		const plantKey = `${farmingMethod}-${plant.plantNum}`;
+		const frozenKey = `plant_${plantKey}_frozenPreds`;
+		const submittedKey = `plant_${plantKey}_${metric}_submittedDate`;
+		const metricKeys = ['leaves','branches','height','width','length'];
+
+		// If there was a submission on a previous date, clear the saved actuals so inputs reset next day
+		const prevSubmitted = localStorage.getItem(submittedKey);
+		if(prevSubmitted && prevSubmitted !== todayStr) {
+			localStorage.removeItem(`plant_${plantKey}_actuals`);
+			metricKeys.forEach(m => localStorage.removeItem(`plant_${plantKey}_${m}_actual`));
+			localStorage.removeItem(submittedKey);
+		}
+
+		let frozenPreds = null;
+		try { frozenPreds = JSON.parse(localStorage.getItem(frozenKey)); } catch(e) { frozenPreds = null; }
+
+		// Create side-by-side predicted and actual layout
+		metricsList.forEach(m => {
+			// predicted value either frozen (if previously submitted) or computed for today
+			let predVal;
+			if(frozenPreds && typeof frozenPreds[m] !== 'undefined') predVal = frozenPreds[m];
+			else predVal = computePredictedValue(m, plant.plantNum, todayStr);
+
+			// Predicted card
+			const predCard = document.createElement('div');
+			predCard.className = 'metric-card metric-predicted';
+			const predLabel = document.createElement('div');
+			predLabel.className = 'metric-label';
+			predLabel.textContent = `PREDICTED ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
+			const predValue = document.createElement('div');
+			predValue.className = 'metric-value';
+			predValue.textContent = formatPred(predVal);
+			predValue.setAttribute('data-metric', m);
+			predValue.setAttribute('data-value', predVal);
+			predCard.appendChild(predLabel);
+			predCard.appendChild(predValue);
+
+			// Actual card with input
+			const actualCard = document.createElement('div');
+			actualCard.className = 'metric-card metric-actual';
+			const actualLabel = document.createElement('div');
+			actualLabel.className = 'metric-label';
+			actualLabel.textContent = `ACTUAL ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
+			const actualInput = document.createElement('input');
+			actualInput.type = 'number';
+			actualInput.step = '0.1';
+			actualInput.className = 'metric-input prediction-input';
+			actualInput.setAttribute('data-metric', m);
+			actualInput.id = `actual-${plantKey}-${m}`;
+			actualInput.placeholder = '0.0';
+			
+			// preload previously submitted actuals
+			const actualsKey = `plant_${plantKey}_actuals`;
+			const metricKey = `plant_${plantKey}_${m}_actual`;
+			let storedActuals = null;
+			let metricVal = null;
+			try { storedActuals = JSON.parse(localStorage.getItem(actualsKey)); } catch(e) { storedActuals = null; }
+			const metricStored = localStorage.getItem(metricKey);
+			if(metricStored !== null && metricStored !== undefined) {
+				const parsed = parseFloat(metricStored);
+				if(Number.isFinite(parsed)) metricVal = parsed;
+			} else if(storedActuals && typeof storedActuals[m] !== 'undefined') {
+				metricVal = storedActuals[m];
+			}
+			if(Number.isFinite(metricVal)) actualInput.value = metricVal;
+			
+			actualCard.appendChild(actualLabel);
+			actualCard.appendChild(actualInput);
+
+			metricsRow.appendChild(predCard);
+			metricsRow.appendChild(actualCard);
+		});
+
+		// Canvas area
 		const canvas = document.createElement('canvas');
 		canvas.className = 'plant-graph-canvas';
 		canvas.id = `plant-${plant.plantNum}-${farmingMethod}-graph`;
 		canvas.width = 600;
 		canvas.height = 250;
-		
+
+		// Legend panel below graph
+		const legendPanel = document.createElement('div');
+		legendPanel.className = 'canvas-legend';
+		legendPanel.innerHTML = `
+			<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
+			<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
+		`;
+
 		card.appendChild(header);
+		card.appendChild(metricsRow);
 		card.appendChild(canvas);
+		card.appendChild(legendPanel);
+
+		// Add "Show all" button to the card (bottom-right)
+		const showAllBtn = document.createElement('button');
+		showAllBtn.className = 'btn show-all-btn';
+		showAllBtn.setAttribute('aria-label', 'Show all data');
+		showAllBtn.textContent = 'Show all';
+		showAllBtn.addEventListener('click', () => {
+			openShowAllModal(plant.plantNum, farmingMethod, metric);
+		});
+		card.appendChild(showAllBtn);
 		container.appendChild(card);
-		
+
+		// If submitted today, disable inputs
+		const submittedDate = localStorage.getItem(submittedKey);
+		if(submittedDate === todayStr) {
+			// disable inputs
+			const inputs = card.querySelectorAll('.prediction-input');
+			inputs.forEach(i => i.disabled = true);
+		}
+
+		// Store plant key and metric for later submission
+		card.setAttribute('data-plant-key', plantKey);
+		card.setAttribute('data-metric', metric);
+
 		// Draw graph for this plant
 		setTimeout(() => {
 			drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
@@ -2073,89 +2503,268 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 		ctx.setLineDash([]);
 	}
 	
-	// Generate prediction data (each plant has slightly different data)
-	const baseValue = (minVal + maxVal) / 2;
-	const variance = (maxVal - minVal) / 8;
-	const plantVariance = (plantNum - 3.5) * (variance * 0.3); // Each plant differs slightly
-	const data = window.randomWalk(30, baseValue + plantVariance, variance)
-		.map(v => Math.max(minVal, Math.min(maxVal, v)));
-	
-	// Draw smooth line with gradient fill
+	// Prepare or reuse datasets for this canvas so toggles/redraws use consistent series
+	if(!canvas._actualData || !canvas._predictedData) {
+		// Use a daily series from Jan 15 to Jan 22 (inclusive) to match requested per-day data
+		const dateLabels = generateDateLabels('2026-01-15', 8); // 8 days: Jan15..Jan22
+		const nPoints = dateLabels.length;
+		const baseValue = (minVal + maxVal) / 2;
+		const variance = (maxVal - minVal) / 8;
+		const plantVariance = (plantNum - 3.5) * (variance * 0.3);
+		const actual = window.randomWalk(nPoints, baseValue + plantVariance, variance)
+			.map(v => Math.max(minVal, Math.min(maxVal, v)));
+		// default predicted derived from actual
+		let predictedSeries = actual.map((v, i) => {
+			const trend = (i / actual.length) * (variance * 0.6);
+			const bias = plantVariance * 0.25;
+			return Math.max(minVal, Math.min(maxVal, v + trend + bias));
+		});
+
+		// If a frozen predicted value exists for this plant/metric, use it to build a stable predicted series
+		try {
+			const frozenKey = `plant_${farmingMethod}-${plantNum}_frozenPreds`;
+			const frozen = JSON.parse(localStorage.getItem(frozenKey));
+			if(frozen && typeof frozen[metric] !== 'undefined') {
+				const frozenVal = parseFloat(frozen[metric]);
+				if(Number.isFinite(frozenVal)) {
+					predictedSeries = new Array(actual.length).fill(frozenVal);
+				}
+			}
+		} catch(e) {
+			// ignore
+		}
+
+		// attach dateLabels to canvas for x-axis rendering and tooltip use
+		canvas._dateLabels = dateLabels;
+		canvas._actualData = actual;
+		canvas._predictedData = predictedSeries;
+	}
+
+	const data = canvas._actualData;
+	const predicted = canvas._predictedData;
+
+	// Draw smooth area/lines using stored data
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
-	
-	// Create gradient fill
+
+	// Create gradient fill for actual
 	const gradient = ctx.createLinearGradient(leftPad, topPad, leftPad, h - bottomPad);
 	gradient.addColorStop(0, 'rgba(43, 110, 246, 0.2)');
 	gradient.addColorStop(1, 'rgba(43, 110, 246, 0)');
-	
-	// Draw fill area
-	ctx.beginPath();
+
+	// Build point lists
 	const points = [];
 	data.forEach((val, i) => {
 		const x = leftPad + (i / (data.length - 1)) * plotW;
 		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
-		points.push({x, y});
-		if(i === 0) ctx.moveTo(x, y);
+		points.push({x, y, v: val});
+	});
+
+	const predPoints = [];
+	predicted.forEach((val, i) => {
+		const x = leftPad + (i / (predicted.length - 1)) * plotW;
+		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
+		predPoints.push({x, y, v: val});
+	});
+
+	// Filled area (Actual) if enabled
+	if(canvas._showActual === undefined) canvas._showActual = true;
+	if(canvas._showPredicted === undefined) canvas._showPredicted = true;
+
+	if(canvas._showActual) {
+		ctx.beginPath();
+		points.forEach((p, i) => {
+			if(i === 0) ctx.moveTo(p.x, p.y);
+			else {
+				const prev = points[i-1];
+				const cpX = (prev.x + p.x) / 2;
+				const cpY = (prev.y + p.y) / 2;
+				ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
+			}
+		});
+		ctx.lineTo(points[points.length - 1].x, h - bottomPad);
+		ctx.lineTo(points[0].x, h - bottomPad);
+		ctx.closePath();
+		ctx.fillStyle = gradient;
+		ctx.fill();
+	}
+
+	// Draw predicted (dashed) below actual markers
+	ctx.beginPath();
+	predPoints.forEach((p, i) => {
+		if(i === 0) ctx.moveTo(p.x, p.y);
 		else {
-			// Smooth curve
-			const prevPoint = points[i - 1];
-			const cpX = (prevPoint.x + x) / 2;
-			const cpY = (prevPoint.y + y) / 2;
-			ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
+			const prev = predPoints[i-1];
+			const cpX = (prev.x + p.x) / 2;
+			const cpY = (prev.y + p.y) / 2;
+			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
 		}
 	});
-	
-	// Close fill area
-	ctx.lineTo(points[points.length - 1].x, h - bottomPad);
-	ctx.lineTo(points[0].x, h - bottomPad);
-	ctx.closePath();
-	ctx.fillStyle = gradient;
-	ctx.fill();
-	
-	// Draw line
+	ctx.setLineDash([6,6]);
+	ctx.strokeStyle = '#facc15';
+	ctx.lineWidth = 2.5;
+	if(canvas._showPredicted) ctx.stroke();
+	ctx.setLineDash([]);
+
+	// Draw actual line on top
 	ctx.beginPath();
-	points.forEach((point, i) => {
-		if(i === 0) ctx.moveTo(point.x, point.y);
+	points.forEach((p, i) => {
+		if(i === 0) ctx.moveTo(p.x, p.y);
 		else {
-			const prevPoint = points[i - 1];
-			const cpX = (prevPoint.x + point.x) / 2;
-			const cpY = (prevPoint.y + point.y) / 2;
-			ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
+			const prev = points[i-1];
+			const cpX = (prev.x + p.x) / 2;
+			const cpY = (prev.y + p.y) / 2;
+			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
 		}
 	});
 	ctx.quadraticCurveTo(points[points.length - 1].x, points[points.length - 1].y, points[points.length - 1].x, points[points.length - 1].y);
-	
 	ctx.strokeStyle = '#2b6ef6';
 	ctx.lineWidth = 3;
 	ctx.lineCap = 'round';
 	ctx.lineJoin = 'round';
 	ctx.shadowColor = 'rgba(43, 110, 246, 0.3)';
 	ctx.shadowBlur = 6;
-	ctx.stroke();
+	if(canvas._showActual) ctx.stroke();
 	ctx.shadowBlur = 0;
-	
-	// Draw data points at key positions
-	points.forEach((point, i) => {
+
+	// Draw markers for actual
+	points.forEach((p, i) => {
 		if(i % 5 === 0 || i === points.length - 1) {
-			ctx.beginPath();
-			ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-			ctx.fillStyle = '#ffffff';
-			ctx.fill();
-			ctx.strokeStyle = '#2b6ef6';
-			ctx.lineWidth = 2;
-			ctx.stroke();
+			if(canvas._showActual) {
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
+				ctx.fillStyle = '#ffffff';
+				ctx.fill();
+				ctx.strokeStyle = '#2b6ef6';
+				ctx.lineWidth = 2;
+				ctx.stroke();
+			}
 		}
 	});
+
+		// store points for interactivity
+		canvas._points = points;
+		canvas._predPoints = predPoints;
+
+		// Draw hover indicator (vertical line + highlight) if hovering
+		if(canvas._hoverIndex !== undefined && canvas._hoverIndex !== null) {
+			const hi = canvas._hoverIndex;
+			if(canvas._points[hi]) {
+				const hp = canvas._points[hi];
+				ctx.save();
+				ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+				ctx.setLineDash([4,4]);
+				ctx.beginPath();
+				ctx.moveTo(hp.x, topPad);
+				ctx.lineTo(hp.x, h - bottomPad);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				ctx.beginPath();
+				ctx.arc(hp.x, hp.y, 6, 0, Math.PI * 2);
+				ctx.fillStyle = '#ffffff';
+				ctx.fill();
+				ctx.lineWidth = 2;
+				ctx.strokeStyle = '#2b6ef6';
+				ctx.stroke();
+				ctx.restore();
+			}
+		}
+
+	// Create DOM legend below canvas (clickable) if not present
+	const parent = canvas.parentElement || canvas.parentNode;
+	if(parent) {
+		let legend = parent.querySelector('.canvas-legend');
+		if(!legend) {
+			legend = document.createElement('div');
+			legend.className = 'canvas-legend';
+			legend.innerHTML = `
+				<span class="legend-item legend-actual" data-series="actual"><span class="legend-swatch actual"></span>Actual</span>
+				<span class="legend-item legend-predicted" data-series="predicted"><span class="legend-swatch predicted"></span>Predicted</span>
+				<div class="legend-tooltip" style="display:none; position:absolute;"></div>
+			`;
+			parent.appendChild(legend);
+
+			// legend click handlers
+			legend.querySelector('.legend-actual').addEventListener('click', () => {
+				canvas._showActual = !canvas._showActual;
+				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+			});
+			legend.querySelector('.legend-predicted').addEventListener('click', () => {
+				canvas._showPredicted = !canvas._showPredicted;
+				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+			});
+		}
+
+		// Tooltip div (reuse existing in legend or create)
+		let tooltip = parent.querySelector('.canvas-hover-tooltip');
+		if(!tooltip) {
+			tooltip = document.createElement('div');
+			tooltip.className = 'canvas-hover-tooltip';
+			tooltip.style.display = 'none';
+			tooltip.style.position = 'absolute';
+			tooltip.style.pointerEvents = 'none';
+			parent.appendChild(tooltip);
+		}
+
+		// Mouse interaction for hover (show values)
+		canvas.onmousemove = function(evt) {
+			const rect = canvas.getBoundingClientRect();
+			const mx = evt.clientX - rect.left;
+			const my = evt.clientY - rect.top;
+			// map mx to nearest index
+			const idx = Math.round(((mx - leftPad) / plotW) * (canvas._points.length - 1));
+			if(idx < 0 || idx >= canvas._points.length) {
+				tooltip.style.display = 'none';
+				canvas._hoverIndex = null;
+				return;
+			}
+			const px = canvas._points[idx].x;
+			const py = canvas._points[idx].y;
+			const actualVal = canvas._actualData[idx];
+			const predVal = canvas._predictedData[idx];
+
+			// position tooltip near the hovered point inside the parent (.plant-graph-card)
+			const parentRect = parent.getBoundingClientRect();
+			// compute left relative to parent
+			const leftPos = (rect.left - parentRect.left) + px + 12;
+			// show tooltip first so offsetHeight is available
+			tooltip.style.display = 'block';
+			tooltip.style.background = '#fff';
+			tooltip.style.border = '1px solid #ddd';
+			tooltip.style.padding = '6px 8px';
+			tooltip.style.borderRadius = '6px';
+			tooltip.innerHTML = `<div style="font-weight:700;">${(canvas._dateLabels && canvas._dateLabels[idx] && canvas._dateLabels[idx].display) || ''}</div>
+								<div style="color:#2b6ef6">Actual: ${actualVal.toFixed(2)}</div>
+								<div style="color:#b8860b">Pred: ${predVal.toFixed(2)}</div>`;
+			const tHeight = tooltip.offsetHeight || 40;
+			let topPos = (rect.top - parentRect.top) + py - tHeight - 8;
+			// if there's no space above the point, show below
+			if(topPos < 6) topPos = (rect.top - parentRect.top) + py + 12;
+			tooltip.style.left = leftPos + 'px';
+			tooltip.style.top = topPos + 'px';
+
+			canvas._hoverIndex = idx;
+			// redraw to show hover vertical line
+			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+		};
+
+		canvas.onmouseout = function() {
+			const tooltipEl = parent.querySelector('.canvas-hover-tooltip');
+			if(tooltipEl) tooltipEl.style.display = 'none';
+			canvas._hoverIndex = null;
+			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
+		};
+	}
 	
-	// X-axis labels
+	// X-axis labels: use per-canvas date labels if available
 	ctx.fillStyle = '#9aa4b8';
 	ctx.font = '10px Segoe UI, Arial, sans-serif';
 	ctx.textAlign = 'center';
-	const days = ['Day 1', 'Day 10', 'Day 20', 'Day 30'];
-	days.forEach((day, i) => {
-		const x = leftPad + (i / (days.length - 1)) * plotW;
-		ctx.fillText(day, x, h - bottomPad + 20);
+	const labels = (canvas._dateLabels && canvas._dateLabels.map(d => d.display)) || ['Day 1','Day 2','Day 3','Day 4'];
+	labels.forEach((lab, i) => {
+		const x = leftPad + (i / (labels.length - 1)) * plotW;
+		ctx.fillText(lab, x, h - bottomPad + 20);
 	});
 	
 	// Y-axis label
@@ -2169,19 +2778,85 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 	ctx.restore();
 }
 
+/* Show All modal controls */
+function openShowAllModal(plantNum, farmingMethod, metric) {
+	const modal = document.getElementById('showAllModal');
+	const title = document.getElementById('showAllTitle');
+	if(!modal || !title) return;
+	title.textContent = `Plant ${plantNum} — ${metric.toUpperCase()} (${farmingMethod})`;
+
+	const smallCanvas = document.getElementById(`plant-${plantNum}-${farmingMethod}-graph`);
+	if(!smallCanvas || !smallCanvas._dateLabels) {
+		showToast('No historical data available for this plant yet.', 'dangerous');
+		return;
+	}
+
+	const tbody = document.querySelector('#showAllTable tbody');
+	if(!tbody) return;
+	tbody.innerHTML = '';
+
+	const dateLabels = Array.isArray(smallCanvas._dateLabels) ? smallCanvas._dateLabels : [];
+	const actualArr = Array.isArray(smallCanvas._actualData) ? smallCanvas._actualData : [];
+	const predArr = Array.isArray(smallCanvas._predictedData) ? smallCanvas._predictedData : [];
+
+	// Build rows for each date label (support labels as objects with display/iso or simple strings)
+	dateLabels.forEach((lbl, idx) => {
+		const display = (lbl && lbl.display) ? lbl.display : (typeof lbl === 'string' ? lbl : (lbl && lbl.iso ? lbl.iso : ''));
+		const actualVal = (typeof actualArr[idx] !== 'undefined' && actualArr[idx] !== null) ? actualArr[idx] : '';
+		const predVal = (typeof predArr[idx] !== 'undefined' && predArr[idx] !== null) ? predArr[idx] : '';
+
+		const tr = document.createElement('tr');
+		tr.innerHTML = `
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0;">${display}</td>
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${actualVal !== '' ? Number(actualVal).toFixed(1) : '-'}</td>
+			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${predVal !== '' ? Number(predVal).toFixed(1) : '-'}</td>
+		`;
+		tbody.appendChild(tr);
+	});
+
+	modal.style.display = 'flex';
+}
+
+function closeShowAllModal() {
+	const modal = document.getElementById('showAllModal');
+	const tbody = document.querySelector('#showAllTable tbody');
+	if(modal) modal.style.display = 'none';
+	if(tbody) tbody.innerHTML = '';
+}
+
+// wire modal close buttons
+setTimeout(() => {
+	const closeBtn = document.getElementById('showAllClose');
+	const okBtn = document.getElementById('showAllOk');
+	if(closeBtn) closeBtn.addEventListener('click', closeShowAllModal);
+	if(okBtn) okBtn.addEventListener('click', closeShowAllModal);
+}, 500);
+
 // Comparison Graph Functionality
-let currentDays = 1;
+let currentDays = 7;
+let currentMetric = 'height';
 let graphData = {
 	aeroponic: [],
 	dwc: [],
 	traditional: []
 };
 
-function generateGraphData(days) {
+function generateGraphData(days, metric) {
 	const points = Math.min(days * 4, 120); // Max 120 points for smoothness
-	
+
+	// Pick base values per metric to simulate different scales
+	const metricBases = {
+		height: { aero: 50, dwc: 45, trad: 40, unit: 'cm' },
+		width: { aero: 30, dwc: 28, trad: 26, unit: 'cm' },
+		length: { aero: 40, dwc: 36, trad: 34, unit: 'cm' },
+		leaves: { aero: 20, dwc: 16, trad: 12, unit: 'count' },
+		branches: { aero: 6, dwc: 5, trad: 4, unit: 'count' }
+	};
+
+	const m = metricBases[metric] || metricBases.height;
+
 	// Aeroponic - fastest growth, highest values
-	const aeroponicBase = 50;
+	const aeroponicBase = m.aero;
 	const aeroponicData = window.randomWalk(points, aeroponicBase, 8)
 		.map((v, i) => Math.max(30, Math.min(100, v + (i / points) * 15)));
 	
@@ -2191,7 +2866,7 @@ function generateGraphData(days) {
 		.map((v, i) => Math.max(25, Math.min(90, v + (i / points) * 12)));
 	
 	// Traditional - slowest growth
-	const traditionalBase = 40;
+	const traditionalBase = m.trad;
 	const traditionalData = window.randomWalk(points, traditionalBase, 6)
 		.map((v, i) => Math.max(20, Math.min(80, v + (i / points) * 10)));
 	
@@ -2211,6 +2886,11 @@ function drawComparisonGraph() {
 	if(!container) return;
 	
 	const containerRect = container.getBoundingClientRect();
+	// If the container is not visible (width/height 0 because tab hidden), retry shortly
+	if ((containerRect.width || 0) < 120 || (containerRect.height || 0) < 80) {
+		setTimeout(drawComparisonGraph, 250);
+		return;
+	}
 	const containerWidth = containerRect.width - 40; // Account for padding
 	const containerHeight = containerRect.height - 40;
 	
@@ -2228,8 +2908,8 @@ function drawComparisonGraph() {
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
 	
-	// Generate data based on current days
-	const data = generateGraphData(currentDays);
+	// Generate data based on current days and selected metric
+	const data = generateGraphData(currentDays, currentMetric);
 	graphData = data;
 	
 	// Find min and max for scaling
@@ -2237,42 +2917,45 @@ function drawComparisonGraph() {
 	const min = Math.min(...allValues);
 	const max = Math.max(...allValues);
 	const range = max - min || 1;
+
+	// helper: convert hex to rgba string
+	function hexToRgba(hex, a){
+		const h = hex.replace('#','');
+		const r = parseInt(h.substring(0,2),16);
+		const g = parseInt(h.substring(2,4),16);
+		const b = parseInt(h.substring(4,6),16);
+		return `rgba(${r}, ${g}, ${b}, ${a})`;
+	}
 	
-	// Draw grid lines
-	ctx.strokeStyle = '#e8ecf4';
+	// Draw grid lines (soft, dashed horizontal lines)
 	ctx.lineWidth = 1;
-	ctx.setLineDash([4, 4]);
-	
-	// Horizontal grid lines
+	ctx.setLineDash([6,6]);
 	for(let i = 0; i <= 5; i++) {
 		const y = topPad + (i / 5) * plotH;
 		ctx.beginPath();
 		ctx.moveTo(leftPad, y);
 		ctx.lineTo(w - rightPad, y);
+		ctx.strokeStyle = hexToRgba('#cbd6df', 1);
 		ctx.stroke();
-		
-		// Y-axis labels
-		if(i === 0 || i === 5 || i === 2.5) {
-			const val = max - (i / 5) * range;
-			ctx.fillStyle = '#6c7380';
-			ctx.font = '11px Poppins, sans-serif';
-			ctx.textAlign = 'right';
-			ctx.setLineDash([]);
-			ctx.fillText(Math.round(val).toString(), leftPad - 10, y + 4);
-			ctx.setLineDash([4, 4]);
-		}
+
+		// Y-axis labels for each grid line
+		const val = (max - (i / 5) * range);
+		ctx.fillStyle = '#6c7380';
+		ctx.font = '12px Poppins, sans-serif';
+		ctx.textAlign = 'right';
+		ctx.fillText(val.toFixed(1), leftPad - 12, y + 4);
 	}
-	
-	// Vertical grid lines
-	ctx.strokeStyle = '#f0f4f8';
-	for(let i = 0; i <= 5; i++) {
+
+	ctx.setLineDash([]);
+	// vertical faint separators
+	for(let i = 0; i <= 5; i++){
 		const x = leftPad + (i / 5) * plotW;
 		ctx.beginPath();
 		ctx.moveTo(x, topPad);
 		ctx.lineTo(x, h - bottomPad);
+		ctx.strokeStyle = hexToRgba('#eef3f7', 1);
 		ctx.stroke();
 	}
-	ctx.setLineDash([]);
 	
 	// Draw lines for each method
 	const methods = [
@@ -2289,12 +2972,12 @@ function drawComparisonGraph() {
 			points.push({ x, y, val });
 		});
 		
-		// Draw gradient fill
-		const gradient = ctx.createLinearGradient(leftPad, topPad, leftPad, h - bottomPad);
-		const color = method.color;
-		gradient.addColorStop(0, color + '30');
-		gradient.addColorStop(1, color + '00');
-		
+		// Draw gradient fill using rgba
+		const gradient = ctx.createLinearGradient(0, topPad, 0, h - bottomPad);
+		gradient.addColorStop(0, hexToRgba(method.color, 0.18));
+		gradient.addColorStop(0.6, hexToRgba(method.color, 0.08));
+		gradient.addColorStop(1, hexToRgba(method.color, 0.02));
+
 		ctx.beginPath();
 		points.forEach((point, i) => {
 			if(i === 0) ctx.moveTo(point.x, point.y);
@@ -2310,8 +2993,8 @@ function drawComparisonGraph() {
 		ctx.closePath();
 		ctx.fillStyle = gradient;
 		ctx.fill();
-		
-		// Draw line
+
+		// Draw smoothed line with soft shadow
 		ctx.beginPath();
 		points.forEach((point, i) => {
 			if(i === 0) ctx.moveTo(point.x, point.y);
@@ -2322,13 +3005,13 @@ function drawComparisonGraph() {
 				ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
 			}
 		});
-		
+
 		ctx.strokeStyle = method.color;
-		ctx.lineWidth = 3;
+		ctx.lineWidth = 3.5;
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
-		ctx.shadowColor = method.color + '40';
-		ctx.shadowBlur = 8;
+		ctx.shadowColor = hexToRgba(method.color, 0.18);
+		ctx.shadowBlur = 18;
 		ctx.stroke();
 		ctx.shadowBlur = 0;
 		
@@ -2336,14 +3019,25 @@ function drawComparisonGraph() {
 		method.points = points;
 	});
 	
-	// Draw data points at key positions
+	// Draw data points at key positions with glow and white center
 	methods.forEach(method => {
 		method.points.forEach((point, i) => {
 			if(i % Math.ceil(method.points.length / 8) === 0 || i === method.points.length - 1) {
+				// outer glow
 				ctx.beginPath();
-				ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+				ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+				ctx.fillStyle = hexToRgba(method.color, 0.12);
+				ctx.fill();
+
+				// white center
+				ctx.beginPath();
+				ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
 				ctx.fillStyle = '#ffffff';
 				ctx.fill();
+
+				// colored ring
+				ctx.beginPath();
+				ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
 				ctx.strokeStyle = method.color;
 				ctx.lineWidth = 2;
 				ctx.stroke();
@@ -2362,14 +3056,17 @@ function drawComparisonGraph() {
 		ctx.fillText(`Day ${day}`, x, h - bottomPad + 20);
 	}
 	
-	// Y-axis label
+	// Y-axis label (based on metric)
+	const metricLabels = { height: 'Height', width: 'Weight', length: 'Length', leaves: 'No. of Leaves', branches: 'No. of Branches' };
+	const unitMap = { height: (data && data.unit) ? data.unit : 'units' };
+	const yLabel = metricLabels[currentMetric] || 'Value';
 	ctx.save();
 	ctx.translate(20, h / 2);
 	ctx.rotate(-Math.PI / 2);
 	ctx.fillStyle = '#6c7380';
 	ctx.font = '12px Poppins, sans-serif';
 	ctx.textAlign = 'center';
-	ctx.fillText('Growth Rate (%)', 0, 0);
+	ctx.fillText(yLabel, 0, 0);
 	ctx.restore();
 	
 	// Store methods for hover detection
@@ -2751,5 +3448,271 @@ function showDWC() {
 	const activeMetricBtn = document.querySelector('.metric-btn.active');
 	const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
 	generatePlantGraphs(metric, 'dwc');
+}
+
+// Theme Toggle Functionality
+function initThemeToggle() {
+	const themeToggle = document.getElementById('themeToggle');
+	const html = document.documentElement;
+	
+	// Get saved theme from localStorage or default to 'glass'
+	const savedTheme = localStorage.getItem('sboltech-theme') || 'glass';
+	html.setAttribute('data-theme', savedTheme);
+	updateThemeIcon(savedTheme);
+	
+	// Theme toggle click handler
+	if(themeToggle) {
+		themeToggle.addEventListener('click', () => {
+			const currentTheme = html.getAttribute('data-theme');
+			const newTheme = currentTheme === 'glass' ? 'original' : 'glass';
+			
+			html.setAttribute('data-theme', newTheme);
+			localStorage.setItem('sboltech-theme', newTheme);
+			updateThemeIcon(newTheme);
+		});
+	}
+}
+
+function updateThemeIcon(theme) {
+	const themeToggle = document.getElementById('themeToggle');
+	if(themeToggle) {
+		const icon = themeToggle.querySelector('.theme-icon');
+		icon.textContent = theme === 'glass' ? '☀️' : '🌙';
+	}
+}
+
+// Initialize theme toggle on page load
+initThemeToggle();
+
+
+// Populate elements with class 'readingvoltage' with a random voltage (mV)
+function populateRandomVoltages() {
+	const els = document.querySelectorAll('.readingvoltage');
+	if (!els || els.length === 0) return;
+	els.forEach(el => {
+		const min = parseFloat(el.dataset.min) || 200; // default min mV
+		const max = parseFloat(el.dataset.max) || 1200; // default max mV
+		const val = Math.random() * (max - min) + min;
+		const formatted = val >= 100 ? val.toFixed(0) : val.toFixed(2);
+		if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = formatted;
+		else el.textContent = formatted + ' mV';
+	});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+	populateRandomVoltages();
+});
+
+// --- Growth State Chart (averages of 6 plants per method) ---
+function getAverageForMethod(methodContainerId, field) {
+	const selector = `#${methodContainerId} .sensor-input1[data-field="${field}"]`;
+	const inputs = document.querySelectorAll(selector);
+	if(!inputs || inputs.length === 0) return 0;
+	let sum = 0, count = 0;
+	inputs.forEach(i => {
+		const val = parseFloat(i.value);
+		if(!Number.isNaN(val)) { sum += val; count++; }
+	});
+	return count > 0 ? (sum / count) : 0;
+}
+
+function computeAverages() {
+	// order: Height, Weight (mapped to width), Length, No. of Leaves, No. of Branches
+	const metrics = ['height','width','length','leaves','branches'];
+	const methods = [
+		{ id: 'aeroponicsParams', label: 'Aeroponics' },
+		{ id: 'dwcParams', label: 'DWC' },
+		{ id: 'traditionalParams', label: 'Traditional' }
+	];
+
+	const results = methods.map(m => {
+		return metrics.map(metric => {
+			return Number(parseFloat(getAverageForMethod(m.id, metric)).toFixed(2));
+		});
+	});
+	return { labels: ['Height','Weight','Length','No. of Leaves','No. of Branches'], datasets: results };
+}
+
+let growthChartInstance = null;
+function setupGrowthChart() {
+	const ctx = document.getElementById('growthStateChart');
+	if(!ctx) return;
+
+	const data = computeAverages();
+	const colors = ['#4CAF50','#2196F3','#FF9800'];
+	const methodLabels = ['Aeroponics','DWC','Traditional'];
+
+	const ctx2d = ctx.getContext('2d');
+	const datasets = data.datasets.map((arr, idx) => {
+		// create a soft vertical gradient for the filled area
+		const g = ctx2d.createLinearGradient(0, 0, 0, 360);
+		g.addColorStop(0, colors[idx] + '22');
+		g.addColorStop(0.6, colors[idx] + '12');
+		g.addColorStop(1, colors[idx] + '04');
+
+		return {
+			label: methodLabels[idx],
+			data: arr,
+			borderColor: colors[idx],
+			backgroundColor: g,
+			tension: 0.35,
+			fill: true,
+			pointRadius: 6,
+			pointBackgroundColor: '#ffffff',
+			pointBorderColor: colors[idx],
+			borderWidth: 2
+		};
+	});
+
+	if(growthChartInstance) {
+		growthChartInstance.data.labels = data.labels;
+		growthChartInstance.data.datasets = datasets;
+		growthChartInstance.update();
+		return;
+	}
+
+	growthChartInstance = new Chart(ctx2d, {
+		type: 'line',
+		data: { labels: data.labels, datasets },
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			interaction: { mode: 'index', intersect: false },
+			scales: {
+				y: {
+					beginAtZero: false,
+					grid: { color: 'rgba(0,0,0,0.04)', borderDash: [6,6] },
+					ticks: { color: '#4b5c3a', font: { weight: 600 } }
+				},
+				x: { grid: { display: false }, ticks: { color: '#3b7a2a', font: { weight: 600 } } }
+			},
+			plugins: {
+				legend: { position: 'top', labels: { usePointStyle: true, padding: 12 } },
+				tooltip: {
+					enabled: true,
+					backgroundColor: '#ffffff',
+					titleColor: '#2f4f2f',
+					bodyColor: '#28402a',
+					borderColor: 'rgba(0,0,0,0.06)',
+					borderWidth: 1,
+					boxPadding: 6,
+					callbacks: {
+						label: function(context) {
+							const label = context.dataset.label || '';
+							const value = context.formattedValue;
+							return label + ': ' + value;
+						}
+					}
+				}
+			}
+		}
+	});
+
+	// Auto-update when training inputs change
+	const inputSelector = '#aeroponicsParams .sensor-input1, #dwcParams .sensor-input1, #traditionalParams .sensor-input1';
+	document.querySelectorAll(inputSelector).forEach(inp => {
+		inp.addEventListener('input', () => {
+			const updated = computeAverages();
+			growthChartInstance.data.datasets.forEach((ds, i) => ds.data = updated.datasets[i]);
+			growthChartInstance.update();
+		});
+	});
+
+	// Refresh button
+	const refreshBtn = document.getElementById('refreshGrowthChart');
+	if(refreshBtn) refreshBtn.addEventListener('click', () => setupGrowthChart());
+}
+
+// initialize chart after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+	setupGrowthChart();
+	// build the small metric charts grid
+	buildMetricMiniCharts();
+});
+
+// --- Mini metric charts (per-metric, show values for 6 plants per method) ---
+const miniCharts = {};
+function getPerPlantValues(methodId, field){
+	const selector = `#${methodId} .sensor-input1[data-field="${field}"]`;
+	const inputs = document.querySelectorAll(selector);
+	const vals = [];
+	inputs.forEach(i => {
+		const v = parseFloat(i.value);
+		vals.push(Number.isFinite(v) ? v : 0);
+	});
+	// ensure length 6
+	while(vals.length < 6) vals.push(0);
+	return vals.slice(0,6);
+}
+
+function buildMetricMiniCharts(){
+	const metrics = [
+		{ id: 'height', label: 'Height' },
+		{ id: 'width', label: 'Weight' },
+		{ id: 'length', label: 'Length' },
+		{ id: 'leaves', label: 'No. of Leaves' },
+		{ id: 'branches', label: 'No. of Branches' }
+	];
+
+	const methods = [ {id:'aeroponicsParams', label:'Aeroponics', color:'#4CAF50'}, {id:'dwcParams', label:'DWC', color:'#2196F3'}, {id:'traditionalParams', label:'Traditional', color:'#FF9800'} ];
+
+	metrics.forEach(metric => {
+		const ctx = document.getElementById(`mini-chart-${metric.id}`);
+		if(!ctx) return;
+		const labels = ['P1','P2','P3','P4','P5','P6'];
+		const datasets = methods.map(m => ({
+			label: m.label,
+			data: getPerPlantValues(m.id, metric.id),
+			borderColor: m.color,
+			backgroundColor: m.color + '22',
+			tension: 0.4,
+			fill: true,
+			pointRadius: 4,
+			pointBackgroundColor: '#fff',
+			borderWidth: 2
+		}));
+
+		miniCharts[metric.id] = new Chart(ctx.getContext('2d'), {
+			type: 'line',
+			data: { labels, datasets },
+			options: { responsive: true, maintainAspectRatio: false, scales:{ y:{ beginAtZero: false, ticks:{ color:'#4b5c3a' } }, x:{ ticks:{ color:'#3b7a2a' } } }, plugins:{ legend:{ display:true, position:'top', labels:{boxWidth:10} } } }
+		});
+	});
+
+	// Overview chart: averages per metric per method
+	const overviewCtx = document.getElementById('mini-chart-overview');
+	if(overviewCtx){
+		const avg = computeAverages(); // returns labels and datasets (three arrays)
+		const labels = avg.labels;
+		const colors = ['#4CAF50','#2196F3','#FF9800'];
+		const methodLabels = ['Aeroponics','DWC','Traditional'];
+		const datasets = avg.datasets.map((arr, idx) => ({ label: methodLabels[idx], data: arr, borderColor: colors[idx], backgroundColor: colors[idx] + '22', tension:0.35, fill:true, pointRadius:4, pointBackgroundColor:'#fff' }));
+		miniCharts['overview'] = new Chart(overviewCtx.getContext('2d'), { type:'line', data:{labels,datasets}, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:false, ticks:{ color:'#4b5c3a' } }, x:{ ticks:{ color:'#3b7a2a' } } }, plugins:{ legend:{ display:true, position:'top' } } } });
+	}
+
+	// Wire input updates to refresh mini charts
+	const inputSelector = '#aeroponicsParams .sensor-input1, #dwcParams .sensor-input1, #traditionalParams .sensor-input1';
+	document.querySelectorAll(inputSelector).forEach(inp => {
+		inp.addEventListener('input', () => updateMiniCharts());
+	});
+}
+
+function updateMiniCharts(){
+	const metrics = ['height','width','length','leaves','branches'];
+	const methods = [ {id:'aeroponicsParams'}, {id:'dwcParams'}, {id:'traditionalParams'} ];
+	metrics.forEach(metric => {
+		const chart = miniCharts[metric];
+		if(!chart) return;
+		chart.data.datasets.forEach((ds, idx) => {
+			ds.data = getPerPlantValues(methods[idx].id, metric);
+		});
+		chart.update();
+	});
+	// overview
+	if(miniCharts['overview']){
+		const avg = computeAverages();
+		miniCharts['overview'].data.datasets.forEach((ds, i) => ds.data = avg.datasets[i]);
+		miniCharts['overview'].update();
+	}
 }
 
