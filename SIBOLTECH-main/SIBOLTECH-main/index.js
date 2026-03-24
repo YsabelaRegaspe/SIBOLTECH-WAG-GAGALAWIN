@@ -1254,27 +1254,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const lastTime = notificationCooldown.get(key) || 0;
 		if(now - lastTime < 8000) return; // prevent spam every interval
 		notificationCooldown.set(key, now);
-
-		const notif = document.createElement('div');
-		notif.className = `notification ${level}`;
-		notif.innerHTML = `
-			<div class="notification-icon">${level === 'dangerous' ? '⚠️' : 'ℹ️'}</div>
-			<div class="notification-content">
-				<div class="notification-title">${sensorThresholds[sensorType]?.name || sensorType}</div>
-				<div class="notification-message">${status} reading: ${value}</div>
-			</div>
-		`;
-
-		container.appendChild(notif);
-
-		setTimeout(() => {
-			notif.classList.add('show');
-		}, 20);
-
-		setTimeout(() => {
-			notif.classList.remove('show');
-			setTimeout(() => notif.remove(), 400);
-		}, 6000);
 	}
 
 	// Threshold modal handling
@@ -1355,7 +1334,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const doValue = (6 + Math.random()*4).toFixed(1);       // 6.0 - 9.9
 		const tempValue = (22 + Math.random()*8).toFixed(1);    // 22.0 - 29.9
 		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
-		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
+		// TDS as whole number (ppm) for realistic thresholds: 200 - 1600
+		const tdsValue = Math.floor(200 + Math.random() * 1401);
 		
 		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
 		const setValueAll = (key, val) => {
@@ -1380,6 +1360,92 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('temp', tempValue);
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
+
+		// Populate the new inline interpretation fields (status, level, recommend)
+		(function populateInterpretations(){
+			const values = {
+				ph: parseFloat(phValue),
+				do: parseFloat(doValue),
+				temp: parseFloat(tempValue),
+				hum: parseFloat(humValue),
+				tds: parseFloat(tdsValue)
+			};
+
+			function getInterpretation(sensor, num){
+				num = parseFloat(num);
+				if(Number.isNaN(num)) return {status: 'Unknown', level: '-', recommendation: 'Check sensor'};
+
+				switch(sensor){
+					case 'ph':
+						if(num < 5.5) return {status: 'Critical - Very Acidic', level: 'Very Low from Normal', recommendation: 'Turn ON pH Up'};
+						if(num >= 5.5 && num < 5.8) return {status: 'Warning - Acidic', level: 'Below Normal', recommendation: 'Turn ON pH Up'};
+						if(num >= 5.8 && num <= 6.2) return {status: 'Normal', level: 'Normal pH', recommendation: 'None'};
+						if(num > 6.2 && num <= 7) return {status: 'Warning - Basic', level: 'Above Normal', recommendation: 'Turn ON pH Down'};
+						return {status: 'Critical - Very Basic', level: 'Very High from Normal', recommendation: 'Turn ON pH Down'};
+					case 'do':
+						if(num < 5) return {status: 'Critical', level: 'Very Low Oxygen', recommendation: 'Turn ON Air Pump'};
+						if(num >= 5 && num < 6.5) return {status: 'Warning - Low Oxygen', level: 'Below Normal', recommendation: 'Turn ON Air Pump'};
+						return {status: 'Normal', level: 'Normal Oxygen', recommendation: 'None'};
+					case 'temp':
+						if(num > 30) return {status: 'Critical - Too Hot', level: 'Very High from Normal', recommendation: 'Turn ON Exhaust Fans'};
+						if(num >= 28 && num <= 29) return {status: 'Warning - Warm', level: 'Above Normal', recommendation: 'Turn ON Exhaust Fans'};
+						if(num >= 19 && num <= 27) return {status: 'Normal', level: 'Normal Temperature', recommendation: 'None'};
+						if(num >= 15 && num <= 18) return {status: 'Warning - Cold', level: 'Below Normal', recommendation: 'Exhaust Fan OFF'};
+						return {status: 'Critical - Too Cold', level: 'Very Low from Normal', recommendation: 'Exhaust Fan OFF'};
+					case 'hum':
+						if(num > 80) return {status: 'Critical - Too Humid', level: 'Very High from Normal', recommendation: 'Turn ON Exhaust Fans'};
+						if(num >= 70 && num <= 79) return {status: 'Warning - Slight Humid', level: 'Above Normal', recommendation: 'Turn ON Exhaust Fans'};
+						if(num >= 50 && num <= 70) return {status: 'Normal', level: 'Normal Humidity', recommendation: 'None'};
+						if(num >= 40 && num < 50) return {status: 'Warning - Slightly Dry', level: 'Below Normal', recommendation: 'Exhaust Fan OFF'};
+						if(num < 30) return {status: 'Critical - Too Dry', level: 'Very Low from Normal', recommendation: 'Exhaust Fan OFF'};
+						return {status: 'Warning - Slightly Dry', level: 'Below Normal', recommendation: 'Exhaust Fan OFF'};
+					case 'tds':
+						if(num < 500) return {status: 'Critical - Too Low', level: 'Very Low from Normal', recommendation: 'Add Leafy Green'};
+						if(num >= 500 && num <= 700) return {status: 'Warning - Low', level: 'Below Normal', recommendation: 'Add Leafy Green'};
+						if(num > 700 && num <= 1400) return {status: 'Normal', level: 'Normal Nutrients', recommendation: 'Plants are Healthy'};
+						return {status: 'Critical - Too High', level: 'Very High from Normal', recommendation: 'Dilute with Water'};
+					default:
+						return {status: 'Unknown', level: '-', recommendation: 'Check sensor'};
+				}
+			}
+
+			function statusToCssClass(s){
+				if(!s) return 'neutral';
+				if(/Very|Too|Low|High|Dry|Hot/i.test(s)) return 'critical';
+				if(/Acidic|Below|Close|Warm|Cold|Slightly/i.test(s)) return 'warning';
+				if(/Normal/i.test(s)) return 'neutral';
+				return 'neutral';
+			}
+
+			Object.keys(values).forEach(k => {
+				const num = values[k];
+				const interp = getInterpretation(k, num);
+
+				// Status
+				const statusEl = document.getElementById(`status-${k}`);
+				if(statusEl){
+					statusEl.textContent = interp.status;
+					statusEl.classList.remove('neutral','warning','critical');
+					statusEl.classList.add(statusToCssClass(interp.status));
+				}
+
+				// Level
+				const levelEl = document.getElementById(`level-${k}`);
+				if(levelEl){
+					const span = levelEl.querySelector('.sensor-line-value');
+					if(span) span.textContent = interp.level;
+					else levelEl.textContent = `Level: ${interp.level}`;
+				}
+
+				// Recommendation
+				const recEl = document.getElementById(`recommend-${k}`);
+				if(recEl){
+					const rspan = recEl.querySelector('.sensor-line-value');
+					if(rspan) rspan.textContent = interp.recommendation;
+					else recEl.textContent = `Recommended: ${interp.recommendation}`;
+				}
+			});
+		})();
 
 		// actuators - only auto-adjust when override is OFF
 		if(!actuatorOverride){
